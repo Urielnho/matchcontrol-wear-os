@@ -1,0 +1,7 @@
+{
+  "historical_f1_lookup": "passed",
+  "basketball_manual_refresh": "passed",
+  "requests_before": 6,
+  "requests_after": 8,
+  "final_screen": "football_home"
+}

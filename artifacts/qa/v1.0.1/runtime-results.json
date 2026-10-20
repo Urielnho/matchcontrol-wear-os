@@ -1,0 +1,13 @@
+{
+  "version": "1.0.1",
+  "device": "MatchControl_Round_QA",
+  "screen": "454x454, 320dpi, circular",
+  "favorite_persisted_after_restart": true,
+  "permission_denied_stays_disabled": true,
+  "permission_granted_enables_alerts": true,
+  "notification_confirmation_observed": true,
+  "offline_saved_real_match_visible": true,
+  "offline_retry_works": true,
+  "connection_restored": true,
+  "sports_alerts_verified_by_unit_rules_not_fabricated_events": true
+}

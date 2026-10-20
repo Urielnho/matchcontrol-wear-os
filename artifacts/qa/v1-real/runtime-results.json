@@ -1,0 +1,13 @@
+{
+  "real_only_ui": "passed",
+  "sports": [
+    "football",
+    "formula1",
+    "basketball",
+    "baseball"
+  ],
+  "quarter_and_inning_details": "passed",
+  "manual_network_refresh": "passed",
+  "requests_before": 13,
+  "requests_after": 14
+}

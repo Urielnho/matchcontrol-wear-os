@@ -1,0 +1,31 @@
+{
+  "passed": 25,
+  "checks": [
+    "switches to identified sandbox",
+    "creates identified QA event 0",
+    "creates QA market 0",
+    "creates fictitious QA odds 0",
+    "creates identified QA event 1",
+    "creates QA market 1",
+    "creates fictitious QA odds 1",
+    "creates identified QA event 2",
+    "creates QA market 2",
+    "creates fictitious QA odds 2",
+    "confirms cloud ticket 0",
+    "cloud retry does not debit twice 0",
+    "confirms cloud ticket 1",
+    "cloud retry does not debit twice 1",
+    "confirms cloud ticket 2",
+    "cloud retry does not debit twice 2",
+    "private worker settles 0",
+    "private worker settles 1",
+    "private worker settles 2",
+    "simple win, combined void adjustment and loss",
+    "server computes exact final credit balance",
+    "worker retry does not credit twice",
+    "authenticated client cannot edit balance",
+    "explicit cloud reset",
+    "cloud reset retry idempotent"
+  ],
+  "secret_exposed": false
+}

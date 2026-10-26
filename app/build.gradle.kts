@@ -6,7 +6,8 @@ plugins {
  id("org.jetbrains.kotlin.plugin.serialization")
 }
 val privateConfig = Properties().apply { rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) } }
-val apiKey = privateConfig.getProperty("FOOTBALL_API_KEY", "").replace("\\", "\\\\").replace("\"", "\\\"")
+// 2.0: credentials belong to the backend. The preserved adapters are disabled in DEMO.
+val apiKey = ""
 android {
  namespace = "com.matchcontrol"
  compileSdk = 36
@@ -14,8 +15,8 @@ android {
   applicationId = "com.matchcontrol"
   minSdk = 30
   targetSdk = 36
-  versionCode = 3
-  versionName = "1.0.1"
+  versionCode = 20
+  versionName = "2.0.0"
   buildConfigField("String", "FOOTBALL_API_KEY", "\"$apiKey\"")
  }
  buildFeatures { compose = true; buildConfig = true }
@@ -23,6 +24,7 @@ android {
 
 }
 dependencies {
+ implementation(project(":core"))
  implementation(platform("androidx.compose:compose-bom:2025.08.00"))
  implementation("androidx.activity:activity-compose:1.10.1")
  implementation("androidx.wear.compose:compose-material3:1.5.0")

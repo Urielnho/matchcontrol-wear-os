@@ -1,3 +1,5 @@
 # Android Studio crea sdk.dir para el SDK instalado en tu computadora.
-# Copia este archivo como local.properties y configura tu propia clave.
-FOOTBALL_API_KEY=YOUR_API_KEY
+# Copia este archivo como local.properties. Solo valores públicos del cliente.
+SUPABASE_URL=https://vxgvhptsxjjixhaldvor.supabase.co
+SUPABASE_PUBLISHABLE_KEY=YOUR_PUBLIC_PUBLISHABLE_KEY
+# FOOTBALL_API_KEY se configura en los secretos del backend, no en Android.

@@ -31,6 +31,8 @@ import kotlinx.coroutines.delay
 
 @Composable fun MatchApp(vm: MatchViewModel, notificationMatch: com.matchcontrol.domain.Match? = null, requestPermission: () -> Unit) {
  val s by vm.state.collectAsStateWithLifecycle()
+ val sandbox by vm.repository.state.collectAsStateWithLifecycle()
+ val link by vm.sync.state.collectAsStateWithLifecycle()
  val sportsVm: SportsViewModel = viewModel()
  val extra by sportsVm.state.collectAsStateWithLifecycle()
  val nav=rememberSwipeDismissableNavController()
@@ -50,7 +52,7 @@ import kotlinx.coroutines.delay
  MatchControlTheme {
   AppScaffold(modifier=Modifier.fillMaxSize().clip(if(config.isScreenRound) CircleShape else RectangleShape).background(MatchColors.Background),timeText={TimeText()}) {
    SwipeDismissableNavHost(navController=nav,startDestination="home") {
-    listOf("home","live","upcoming","results","favorites","settings","details","sports","sportfeed","sportdetail").forEach { route -> composable(route) {
+    listOf("home","live","upcoming","results","favorites","settings","details","sports","sportfeed","sportdetail","sandbox").forEach { route -> composable(route) {
  val matches=s.matches.filter { m -> s.settings.leagues.isEmpty() || s.competitions.any { it.id.toString() in s.settings.leagues && it.includes(m) } }
 
      LaunchedEffect(route) { if(route=="home") vm.today() }
@@ -74,10 +76,11 @@ import kotlinx.coroutines.delay
         else Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
          IconButton(onClick={nav.popBackStack()},modifier=Modifier.size(MatchSpace.Touch).semantics { contentDescription="Volver" }) { SportGlyph(Glyph.Back,Modifier.size(20.dp)) }
          Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-         Text(when(route) { "live"->"En vivo";"upcoming"->"Próximos";"results"->"Resultados";"favorites"->"Favoritos";"settings"->"Ajustes";"sports"->"Deportes";"sportfeed","sportdetail"->extra.sport.title;else->"Partido" },style=MatchType.Title,color=MatchColors.Text)
+         Text(when(route) { "sandbox"->"Boletos";"live"->"En vivo";"upcoming"->"Próximos";"results"->"Resultados";"favorites"->"Favoritos";"settings"->"Ajustes";"sports"->"Deportes";"sportfeed","sportdetail"->extra.sport.title;else->"Partido" },style=MatchType.Title,color=MatchColors.Text)
          }
         }
        }
+       if(sandbox.source=="DEMO") item(key="demo") { Text("DEMO · datos ficticios",style=MatchType.Micro,color=MatchColors.Accent) }
        if(!s.settingsReady || routeLoading || (route=="details" && s.detailLoading)) item(key="loading") {
         Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
          CircularProgressIndicator(modifier=Modifier.size(22.dp),strokeWidth=2.dp)
@@ -94,10 +97,14 @@ import kotlinx.coroutines.delay
         }
        }
        when(route) {
-        "home"->premiumHome(s,matches,{nav.navigate(it)},{vm.select(it);nav.navigate("details")})
+        "home"->{premiumHome(s,matches,{nav.navigate(it)},{vm.select(it);nav.navigate("details")});item {SportAction("Créditos y boletos",Glyph.Star) {nav.navigate("sandbox")}}}
         "live","upcoming","results"->sportListing(route,s,matches,vm::day) { vm.select(it);nav.navigate("details") }
         "favorites"->favoriteContent(s,matches,vm::toggleTeam,{nav.navigate(it)},vm::day) { vm.select(it);nav.navigate("details") }
-        "details"->detailContent(s,vm::toggleTeam)
+        "details"->{detailContent(s,vm::toggleTeam);s.detail?.let { match->
+         item {SportAction("Enviar al móvil",Glyph.Refresh) {vm.sync.command(com.matchcontrol.core.SyncCommand(action="select",target=vm.externalId(match.id)))}}
+         item {SportAction(if(vm.externalId(match.id) in sandbox.favoriteMatches) "Quitar partido favorito" else "Guardar partido",Glyph.Star) {vm.sync.command(com.matchcontrol.core.SyncCommand(action="match",target=vm.externalId(match.id),enabled=vm.externalId(match.id) !in sandbox.favoriteMatches))}}
+        }}
+        "sandbox"->sandboxContent(sandbox,link,vm.repository.hasReplica()) {vm.sync.refresh()}
         "sports"->sportsPicker { sport -> if(sport==Sport.FOOTBALL) nav.popBackStack("home",false) else { sportsVm.choose(sport);nav.navigate("sportfeed") } }
         "sportfeed"->sportsFeed(extra,sportsVm::day,{sportsVm.refresh(true)}) { sportsVm.select(it);nav.navigate("sportdetail") }
         "sportdetail"->sportsDetail(extra)

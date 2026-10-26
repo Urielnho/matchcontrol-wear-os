@@ -1,0 +1,62 @@
+package com.matchcontrol.core
+
+import android.content.Context
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+import android.content.ContentValues
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.Json
+
+/** A SQLite transaction serializes the entire bounded educational aggregate. */
+class DemoRepository(private val context: Context,val authority: Boolean,private val databaseName: String="matchcontrol-v2.db"): MatchesRepository,ResultsRepository,OddsRepository,UsersRepository,WalletsRepository,BetsRepository,HistoryRepository {
+ private val db=object:SQLiteOpenHelper(context,databaseName,null,1) {
+  override fun onCreate(db: SQLiteDatabase) { db.execSQL("CREATE TABLE state(id INTEGER PRIMARY KEY CHECK(id=1),payload TEXT NOT NULL)");db.execSQL("CREATE TABLE outbox(id TEXT PRIMARY KEY,payload TEXT NOT NULL)") }
+  override fun onUpgrade(db: SQLiteDatabase,old: Int,new: Int) = Unit
+ }
+ private val json=Json { ignoreUnknownKeys=true;encodeDefaults=true }
+ private fun read(): Snapshot?=db.readableDatabase.rawQuery("SELECT payload FROM state WHERE id=1",null).use { if(it.moveToFirst()) json.decodeFromString<Snapshot>(it.getString(0)) else null }
+ private fun write(s: Snapshot) { check(db.writableDatabase.insertWithOnConflict("state",null,ContentValues().apply { put("id",1);put("payload",json.encodeToString(s)) },SQLiteDatabase.CONFLICT_REPLACE)!=-1L) {"No se pudo guardar el estado"} }
+ private val mutable=MutableStateFlow(read() ?: DemoEngine.seed().also(::write))
+ val state=mutable.asStateFlow()
+ @Synchronized fun update(block: (Snapshot)->Snapshot): Snapshot {
+  check(authority) { "El reloj es una réplica; confirma operaciones desde el móvil" }
+  val database=db.writableDatabase;database.beginTransaction()
+  val result=try { val old=read()!!;val next=block(old).let { if(it==old) old else it.copy(revision=old.revision+1,updatedAt=System.currentTimeMillis()) };write(next);database.setTransactionSuccessful();next } finally { database.endTransaction() }
+  val previous=mutable.value;mutable.value=result;runCatching {ResultAlerts.changed(context,previous,result)};return result
+ }
+ @Synchronized fun applySnapshot(snapshot: Snapshot) {
+  check(!authority)
+  // First authoritative snapshot replaces a seeded preview, then revisions are monotonic.
+  val received=contextPreferences.getBoolean("received",false)
+  if(received && snapshot.profile.id==mutable.value.profile.id && snapshot.source==mutable.value.source && snapshot.revision<mutable.value.revision) return
+  val previous=mutable.value;write(snapshot);mutable.value=snapshot;contextPreferences.edit().putBoolean("received",true).apply();runCatching {ResultAlerts.changed(context,previous,snapshot)}
+ }
+ private val contextPreferences=context.getSharedPreferences("v2-replica-$databaseName",Context.MODE_PRIVATE)
+ fun hasReplica()=contextPreferences.getBoolean("received",false)
+ override fun matches()=state.value.fixtures
+ override fun results()=matches().filter { it.status==FixtureStatus.FINAL }
+ override fun markets(matchId: String)=state.value.outcomes.filter { it.matchId==matchId }
+ override fun profile()=state.value.profile
+ override fun balance()=state.value.balance
+ override fun history()=state.value.bets
+ override fun movements()=state.value.transactions
+ override fun place(request: BetRequest): Bet { var bet: Bet?=null;update { val result=DemoEngine.place(it,request);bet=result.second;result.first };return requireNotNull(bet) }
+ override fun reset(requestId: String) { update { DemoEngine.reset(it,requestId) } }
+ fun command(c: SyncCommand) { update { s->
+  if(c.id in s.processed) s else {
+   require(c.action in setOf("team","league","match","select","refresh")) { "Acción no permitida" }
+   fun Set<String>.set()=if(c.enabled) this+c.target else this-c.target
+   val next=when(c.action) {
+    "team"->{ require(s.fixtures.any { it.home.id==c.target || it.away.id==c.target });s.copy(favoriteTeams=s.favoriteTeams.set()) }
+    "league"->{ require(s.fixtures.any { it.leagueId==c.target });s.copy(favoriteLeagues=s.favoriteLeagues.set()) }
+    "match"->{ require(s.fixtures.any { it.id==c.target });s.copy(favoriteMatches=s.favoriteMatches.set()) }
+    "select"->{ require(s.fixtures.any { it.id==c.target });s.copy(selectedMatch=c.target) }
+    else->s
+   };next.copy(processed=next.processed+c.id)
+  }
+ } }
+ fun enqueue(c: SyncCommand) { db.writableDatabase.insertWithOnConflict("outbox",null,ContentValues().apply { put("id",c.id);put("payload",json.encodeToString(c)) },SQLiteDatabase.CONFLICT_IGNORE) }
+ fun pending(): List<SyncCommand> = db.readableDatabase.rawQuery("SELECT payload FROM outbox ORDER BY rowid",null).use { cursor->buildList { while(cursor.moveToNext()) add(json.decodeFromString<SyncCommand>(cursor.getString(0))) } }
+ fun ack(ids: Set<String>) { ids.forEach { db.writableDatabase.delete("outbox","id=?",arrayOf(it)) } }
+}

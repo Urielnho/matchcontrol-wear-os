@@ -10,10 +10,10 @@ Push-Location $PSScriptRoot
 try {
  if (!$SinCompilar) {
   if (!$env:JAVA_HOME) { $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr' }
-  & .\gradlew.bat assembleDebug --console=plain
+  & .\gradlew.bat :wear:assembleDebug --console=plain
   if ($LASTEXITCODE -ne 0) { throw 'La compilación falló. Revisa el mensaje de Gradle.' }
  }
- $apkPath = Join-Path $PSScriptRoot 'app\build\outputs\apk\debug\app-debug.apk'
+ $apkPath = Join-Path $PSScriptRoot 'app\build\outputs\apk\debug\wear-debug.apk'
  if (!(Test-Path -LiteralPath $apkPath)) { throw 'Falta el APK. Ejecuta el script sin -SinCompilar.' }
  $devices = & $adbPath devices
  if (!($devices -match '^emulator-5558\s+device')) {

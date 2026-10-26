@@ -1,0 +1,22 @@
+{
+  "core": {
+    "tests": 16,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "app": {
+    "tests": 31,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "mobile-lint": {
+    "Error": 0,
+    "Warning": 7
+  },
+  "app-lint": {
+    "Error": 0,
+    "Warning": 20
+  }
+}

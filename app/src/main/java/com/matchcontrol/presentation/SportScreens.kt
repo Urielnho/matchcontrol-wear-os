@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
@@ -196,12 +197,12 @@ fun TransformingLazyColumnScope.detailContent(state: UiState,toggle: (Team)->Uni
 }
 fun TransformingLazyColumnScope.settingsContent(state: UiState,vm: MatchViewModel,permission: ()->Unit) {
  item { SectionTitle("Experiencia",Glyph.Settings) }
- item { SportAction(if(state.settings.notifications) "Avisos activados" else "Activar avisos",Glyph.Bell,state.settings.notifications) { if(state.settings.notifications) vm.setNotifications(false) else permission() } }
- item { Text("Inicio, goles y final de tus equipos de fútbol al actualizar la app. Requiere permiso del reloj.",style=MatchType.Caption,color=MatchColors.Secondary) }
+ item {Text("Administra el perfil y los avisos desde el móvil.",style=MatchType.Caption,color=MatchColors.Secondary)}
+ item { Text("Avisos del estado de tus boletos.",style=MatchType.Caption,color=MatchColors.Secondary) }
  if(state.settings.teams.isEmpty()) item { Text("Sigue un equipo desde un partido para recibir sus avisos.",style=MatchType.Caption,color=MatchColors.Warning) }
- item { Text("MatchControl 1.0.1",style=MatchType.Caption,color=MatchColors.Secondary) }
+ item { Text("MatchControl 2.0",style=MatchType.Caption,color=MatchColors.Secondary) }
  item { SectionTitle("Conexión",Glyph.Stats) }
- item { StatusNotice(if(state.online) Glyph.Check else Glyph.Offline,if(state.online) "Conectado" else "Sin internet","Los datos guardados siguen disponibles.",if(state.online) MatchColors.Accent else MatchColors.Warning) }
+ item {val link=vm.sync.state.collectAsStateWithLifecycle().value;StatusNotice(if(link.connected) Glyph.Check else Glyph.Offline,if(link.connected) "Móvil conectado" else "Sin vínculo","Los datos guardados siguen disponibles.",if(link.connected) MatchColors.Accent else MatchColors.Warning)}
  item { Text("Actualizado: "+if(state.updated==0L) "pendiente" else Instant.ofEpochMilli(state.updated).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd MMM · HH:mm")),style=MatchType.Caption,color=MatchColors.Secondary) }
  item { SectionTitle("Competiciones",Glyph.Ball) }
  item { Text("Sin selección se muestran todas.",style=MatchType.Caption,color=MatchColors.Secondary) }

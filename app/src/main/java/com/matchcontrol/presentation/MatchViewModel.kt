@@ -12,7 +12,7 @@ import java.time.LocalDate
 import kotlinx.serialization.json.Json
 
 data class UiState(val settings: Settings=Settings(), val date: LocalDate=LocalDate.now(), val matches: List<Match> = emptyList(), val detail: Match?=null, val loading: Boolean=false, val error: String?=null, val updated: Long=0, val stale: Boolean=false, val online: Boolean=false, val competitions: List<Competition> = emptyList(), val remainingCalls: Int? = null, val knownTeams: List<Team> = emptyList(), val settingsReady: Boolean = false, val detailLoading: Boolean = false)
-class MatchViewModel(app: Application): AndroidViewModel(app) {
+class LegacyMatchViewModel(app: Application): AndroidViewModel(app) {
  private val store=SettingsStore(app)
  private val api=ApiRepository(app)
  private val notifications=MatchNotifications(app)

@@ -1,0 +1,22 @@
+{
+  "sign_in": 200,
+  "snapshot": {
+    "status": 200,
+    "balance": 1000000,
+    "fixture_count": 161,
+    "error": null
+  },
+  "football": {
+    "status": 200,
+    "count": 161,
+    "stale": false,
+    "error": null
+  },
+  "normalized": {
+    "status": 200,
+    "count": 161,
+    "source": "API_FOOTBALL"
+  },
+  "unauthenticated": 401,
+  "invalid_token": 401
+}

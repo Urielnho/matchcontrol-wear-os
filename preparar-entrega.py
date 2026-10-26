@@ -1,41 +1,52 @@
-"""Package the local classroom delivery without private project configuration."""
+"""Package both development apps and clean sources; reject embedded private keys."""
 from pathlib import Path
-import hashlib,json,shutil,zipfile,xml.etree.ElementTree as ET
+import hashlib, json, shutil, zipfile, xml.etree.ElementTree as ET
 
-root=Path(__file__).resolve().parent
-out=root/"entrega"
-out.mkdir(exist_ok=True)
-apk=root/"app/build/outputs/apk/debug/app-debug.apk"
-shutil.copy2(apk,out/"MatchControl-1.0.1.apk")
-for name in ["README.md","VALIDACION.md"]:
- shutil.copy2(root/name,out/name)
-shutil.copy2(root/"docs/GUIA-PRESENTACION.md",out/"GUIA-PRESENTACION.md")
-qa=root/"artifacts/qa/v1.0.1"
-captures=out/"capturas"
-captures.mkdir(exist_ok=True)
-for name in ["01-inicio","02-accesos","07-equipo-seguido","08-favorito-persistente","09-permiso","10-avisos-rechazados","11-avisos-activados","12-sin-internet","13-conexion-restaurada","15-deportes","16-formula1"]:
- latest=root/"artifacts/qa/minimal"/(name+".png")
- shutil.copy2(latest if latest.exists() else qa/(name+".png"),captures/(name+".png"))
-shutil.copy2(qa/"recorrido.mp4",out/"Recorrido-MatchControl.mp4")
-members=[]
-for directory in ["app/src","gradle","docs",".run"]:
- members.extend(p for p in (root/directory).rglob("*") if p.is_file())
-for name in [".gitignore","build.gradle.kts","settings.gradle.kts","gradle.properties","gradlew","gradlew.bat","app/build.gradle.kts","README.md","VALIDACION.md","REDISENO.md","ejecutar-circular.ps1","preparar-entrega.py"]:
- members.append(root/name)
-# Verify the archive never embeds the configured private credential.
-key=next((line.split("=",1)[1].strip() for line in (root/"local.properties").read_text(encoding="utf-8").splitlines() if line.startswith("FOOTBALL_API_KEY=")),"")
-with zipfile.ZipFile(out/"Codigo-MatchControl.zip","w",zipfile.ZIP_DEFLATED) as archive:
- for file in sorted(members):
-  data=file.read_bytes()
-  if key and key.encode() in data: raise RuntimeError("Private configuration found in a source file; packaging stopped.")
-  archive.writestr(file.relative_to(root).as_posix(),data)
-tests=[ET.parse(p).getroot() for p in (root/"app/build/test-results/testDebugUnitTest").glob("TEST-*.xml")]
-summary={k:sum(int(r.get(k,0)) for r in tests) for k in ["tests","failures","errors","skipped"]}
-lint=ET.parse(root/"app/build/reports/lint-results-debug.xml").getroot()
-summary["lint_errors"]=sum(x.get("severity")=="Error" for x in lint)
-summary["lint_warnings"]=sum(x.get("severity")=="Warning" for x in lint)
-summary["apk_sha256"]=hashlib.sha256(apk.read_bytes()).hexdigest()
-summary["source_excludes_private_configuration"]=True
-summary["files"]={p.name:p.stat().st_size for p in out.iterdir() if p.is_file() and p.name!="COMPROBACION.json"}
-(out/"COMPROBACION.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
-print(json.dumps(summary,indent=2))
+root = Path(__file__).resolve().parent
+out = root / "entrega/v2"
+out.mkdir(parents=True, exist_ok=True)
+keys = []
+local = root / "local.properties"
+if local.exists():
+    for line in local.read_text(encoding="utf-8").splitlines():
+        if line.startswith("FOOTBALL_API_KEY=") and line.split("=",1)[1].strip():
+            keys.append(line.split("=",1)[1].strip().encode())
+
+def check(data, name):
+    if any(key in data for key in keys):
+        raise RuntimeError("Private provider credential found: " + name)
+
+apks = {"MatchControl-Mobile-2.0.apk": root/"mobile/build/outputs/apk/debug/mobile-debug.apk",
+        "MatchControl-Wear-2.0.apk": root/"app/build/outputs/apk/debug/wear-debug.apk"}
+for name, apk in apks.items():
+    with zipfile.ZipFile(apk) as archive:
+        for entry in archive.namelist():
+            check(archive.read(entry), entry)
+    shutil.copy2(apk, out/name)
+
+members = set()
+for directory in ["app/src", "mobile/src", "core/src", "gradle", "docs", ".run", "supabase/functions", "supabase/migrations"]:
+    members.update(p for p in (root/directory).rglob("*") if p.is_file() and "__pycache__" not in p.parts)
+for directory in ["backend-tests"]:
+    members.update(p for p in (root/directory).iterdir() if p.is_file() and p.suffix in {".json", ".mjs", ".js", ".py"})
+for name in [".gitignore", "build.gradle.kts", "settings.gradle.kts", "gradle.properties", "gradlew", "gradlew.bat", "app/build.gradle.kts", "mobile/build.gradle.kts", "core/build.gradle.kts", "README.md", "VALIDACION.md", "REDISENO.md", "local.properties.example", "supabase/config.toml", "supabase/.env.example", "ejecutar-circular.ps1", "preparar-entrega.py"]:
+    members.add(root/name)
+with zipfile.ZipFile(out/"Codigo-MatchControl-2.0.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+    for path in sorted(members):
+        data=path.read_bytes(); check(data, str(path.relative_to(root)))
+        archive.writestr(path.relative_to(root).as_posix(), data)
+for name in ["README.md", "docs/ESTADO-2.0.md", "docs/GUIA-PRESENTACION.md"]:
+    shutil.copy2(root/name, out/Path(name).name)
+captures=out/"capturas"; captures.mkdir(exist_ok=True)
+for path in (root/"artifacts/qa/v2").glob("premium-*.png"):
+    shutil.copy2(path, captures/path.name)
+report={"development_apks": True, "private_provider_key_absent": True}
+for module in ["core", "app"]:
+    suites=[ET.parse(p).getroot() for p in (root/module/"build/test-results/testDebugUnitTest").glob("TEST-*.xml")]
+    report[module]={key:sum(int(s.get(key,0)) for s in suites) for key in ["tests","failures","errors","skipped"]}
+for module in ["mobile", "app"]:
+    lint=ET.parse(root/module/"build/reports/lint-results-debug.xml").getroot()
+    report[module+"_lint"]={severity:sum(i.get("severity")==severity for i in lint) for severity in ["Error","Warning"]}
+report["sha256"]={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in out.iterdir() if p.suffix in {".apk", ".zip"}}
+(out/"COMPROBACION.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+print(json.dumps(report,indent=2))

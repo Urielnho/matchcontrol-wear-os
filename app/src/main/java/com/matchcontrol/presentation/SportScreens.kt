@@ -196,6 +196,7 @@ fun TransformingLazyColumnScope.detailContent(state: UiState,toggle: (Team)->Uni
 
 }
 fun TransformingLazyColumnScope.settingsContent(state: UiState,vm: MatchViewModel,permission: ()->Unit) {
+ item {val shared=vm.mirror.collectAsStateWithLifecycle().value;Text("Cuenta del móvil",style=MatchType.Label,color=MatchColors.Accent);Text(if(!vm.repository.hasReplica()) "Vincula tu móvil para continuar" else if(shared.accountSignedIn) shared.profile.displayName else "Modo DEMO del móvil",style=MatchType.Body,color=MatchColors.Text)}
  item { SectionTitle("Experiencia",Glyph.Settings) }
  item {Text("Administra el perfil y los avisos desde el móvil.",style=MatchType.Caption,color=MatchColors.Secondary)}
  item { Text("Avisos del estado de tus boletos.",style=MatchType.Caption,color=MatchColors.Secondary) }

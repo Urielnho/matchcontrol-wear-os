@@ -1,6 +1,6 @@
 {
   "core": {
-    "tests": 16,
+    "tests": 20,
     "failures": 0,
     "errors": 0,
     "skipped": 0
@@ -11,12 +11,17 @@
     "errors": 0,
     "skipped": 0
   },
-  "mobile-lint": {
+  "mobile_lint": {
     "Error": 0,
     "Warning": 7
   },
-  "app-lint": {
+  "app_lint": {
     "Error": 0,
     "Warning": 20
-  }
+  },
+  "android_instrumented": {
+    "tests": 5,
+    "failures": 0
+  },
+  "paired_transport_tested": false
 }

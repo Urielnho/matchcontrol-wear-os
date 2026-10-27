@@ -49,7 +49,9 @@ Las consultas al proveedor se realizan solo desde el backend. La cobertura depen
 
 ## Reloj y conexión
 
-Vincula los dispositivos mediante **Device Manager → Pair Wearable** (o el procedimiento del reloj físico). Tener dos emuladores abiertos no significa que estén vinculados. DataClient transporta resúmenes pequeños; MessageClient lleva acciones inmediatas. SQLite conserva la réplica y la cola de acciones del reloj durante una desconexión. Las acciones incluyen identificador idempotente y cuenta de origen. El reloj no confirma apuestas ni ejecuta transacciones de saldo.
+Inicia sesión solo en el móvil: el reloj utiliza esa misma cuenta, saldo, favoritos y boletos, sin otra contraseña ni cartera independiente. Antes del primer enlace muestra “Vincula tu móvil”. Los cambios del móvil se publican automáticamente, con mensajes inmediatos cuando hay vínculo y una copia persistente para reconexión. El reloj permite consultar cada selección del boleto, su cuota, estado, importe y retorno; las confirmaciones financieras se realizan en el móvil.
+
+Vincula los dispositivos mediante **Device Manager → Pair Wearable** (o el procedimiento del reloj físico). El teléfono del asistente requiere Android 11 o posterior y Play Store. Tener dos emuladores abiertos no significa que estén vinculados. DataClient conserva el estado y MessageClient lleva actualizaciones y acciones inmediatas. SQLite guarda la réplica y la cola del reloj durante una desconexión. Las acciones incluyen identificador, cuenta y secuencia; los cambios atrasados no pueden restaurar una cuenta anterior ni deshacer el último favorito. No se copian contraseñas ni tokens de sesión al reloj. [Requisitos oficiales de vinculación](https://developer.android.com/training/wearables/get-started/connect-phone).
 
 ## Pruebas y estado
 

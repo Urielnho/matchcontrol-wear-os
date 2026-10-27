@@ -17,8 +17,10 @@ class DemoRepository(private val context: Context,val authority: Boolean,private
  private val json=Json { ignoreUnknownKeys=true;encodeDefaults=true }
  private fun read(): Snapshot?=db.readableDatabase.rawQuery("SELECT payload FROM state WHERE id=1",null).use { if(it.moveToFirst()) json.decodeFromString<Snapshot>(it.getString(0)) else null }
  private fun write(s: Snapshot) { check(db.writableDatabase.insertWithOnConflict("state",null,ContentValues().apply { put("id",1);put("payload",json.encodeToString(s)) },SQLiteDatabase.CONFLICT_REPLACE)!=-1L) {"No se pudo guardar el estado"} }
- private val mutable=MutableStateFlow(read() ?: DemoEngine.seed().also(::write))
+ private val mutable=MutableStateFlow(read() ?: (if(authority) DemoEngine.seed() else Snapshot(profile=Profile(id="",displayName=""),balance=0)).also(::write))
  val state=mutable.asStateFlow()
+ private val queued=MutableStateFlow(pending())
+ val pendingCommands=queued.asStateFlow()
  @Synchronized fun update(block: (Snapshot)->Snapshot): Snapshot {
   check(authority) { "El reloj es una réplica; confirma operaciones desde el móvil" }
   val database=db.writableDatabase;database.beginTransaction()
@@ -33,6 +35,23 @@ class DemoRepository(private val context: Context,val authority: Boolean,private
   val previous=mutable.value;write(snapshot);mutable.value=snapshot;contextPreferences.edit().putBoolean("received",true).apply();runCatching {ResultAlerts.changed(context,previous,snapshot)}
  }
  private val contextPreferences=context.getSharedPreferences("v2-replica-$databaseName",Context.MODE_PRIVATE)
+ @Synchronized fun applyMirror(frame: MirrorFrame): Boolean {
+  check(!authority)
+  require(frame.authorityId.isNotBlank() && frame.sequence>0)
+  val epoch=contextPreferences.getString("authority",null)
+  val retired=contextPreferences.getStringSet("retired",emptySet()).orEmpty()
+  if(frame.authorityId in retired || (frame.authorityId==epoch && frame.sequence<=contextPreferences.getLong("sequence",0))) return false
+  val old=mutable.value
+  write(frame.snapshot)
+  // Account changes also discard offline actions owned by the previous account.
+  pending().filter {it.profileId!=frame.snapshot.profile.id || it.source!=frame.snapshot.source || it.id in frame.snapshot.processed}.forEach {db.writableDatabase.delete("outbox","id=?",arrayOf(it.id))}
+  queued.value=pending()
+  contextPreferences.edit().putBoolean("received",true).putString("authority",frame.authorityId).putLong("sequence",frame.sequence)
+   .putStringSet("retired",if(epoch!=null && epoch!=frame.authorityId) retired+epoch else retired).commit()
+  mutable.value=frame.snapshot
+  runCatching {ResultAlerts.changed(context,old,frame.snapshot)}
+  return true
+ }
  fun hasReplica()=contextPreferences.getBoolean("received",false)
  override fun matches()=state.value.fixtures
  override fun results()=matches().filter { it.status==FixtureStatus.FINAL }
@@ -56,7 +75,7 @@ class DemoRepository(private val context: Context,val authority: Boolean,private
    };next.copy(processed=next.processed+c.id)
   }
  } }
- fun enqueue(c: SyncCommand) { db.writableDatabase.insertWithOnConflict("outbox",null,ContentValues().apply { put("id",c.id);put("payload",json.encodeToString(c)) },SQLiteDatabase.CONFLICT_IGNORE) }
+ @Synchronized fun enqueue(c: SyncCommand) { db.writableDatabase.insertWithOnConflict("outbox",null,ContentValues().apply { put("id",c.id);put("payload",json.encodeToString(c)) },SQLiteDatabase.CONFLICT_IGNORE);queued.value=pending() }
  fun pending(): List<SyncCommand> = db.readableDatabase.rawQuery("SELECT payload FROM outbox ORDER BY rowid",null).use { cursor->buildList { while(cursor.moveToNext()) add(json.decodeFromString<SyncCommand>(cursor.getString(0))) } }
- fun ack(ids: Set<String>) { ids.forEach { db.writableDatabase.delete("outbox","id=?",arrayOf(it)) } }
+ @Synchronized fun ack(ids: Set<String>) { ids.forEach { db.writableDatabase.delete("outbox","id=?",arrayOf(it)) };queued.value=pending() }
 }

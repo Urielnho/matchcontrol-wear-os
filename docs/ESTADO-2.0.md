@@ -15,9 +15,9 @@
 
 | Alcance | Resultado |
 | --- | --- |
-| JVM core | 16 pruebas aprobadas |
+| JVM core | 20 pruebas aprobadas |
 | JVM reloj, existentes | 31 pruebas aprobadas |
-| Android instrumentado | 3 pruebas aprobadas: SQLite, cola/réplica y cifrado Keystore |
+| Android instrumentado | 5 pruebas aprobadas: SQLite, cola/réplica, cifrado Keystore, cambios de cuenta y orden de favoritos |
 | PostgreSQL local, PGlite con Auth simulado | 24 pruebas aprobadas |
 | Backend alojado, contabilidad con cuenta QA | 25 comprobaciones aprobadas |
 | Auth y proveedor alojados | Acceso 200, consulta de 161 encuentros reales; accesos sin token o inválidos 401 |
@@ -26,16 +26,29 @@
 | Sin conexión y reconexión | Sesión y encuentros reales conservados tras reiniciar; aviso retirado al recuperar internet |
 | Interfaz Wear OS circular | APK instalado y abierto; pantalla de créditos y boletos comprobada visualmente |
 | Parlay móvil | Dos partidos distintos elegidos desde la interfaz, boleto confirmado y conservado tras reiniciar. Acceso visible para agregar otro partido; límite de diez eventos. |
+| Cuenta compartida, interfaz | Favorito añadido desde el móvil y conservado al reiniciar; reloj sin cuenta ni saldo propios antes de vincularse. Capturas actualizadas. |
 
 La prueba financiera alojada cubrió simples, combinada, victoria, derrota, anulación, reintentos sin doble débito ni doble abono, bloqueo de escritura directa de saldo y reinicio explícito. Utilizó eventos QA identificados como DEMO; no alteró resultados reales.
 
 La cuenta temporal QA se cerró en el teléfono y se eliminó junto con sus eventos educativos al terminar. Las capturas conservan la evidencia, sin contraseñas. El usuario puede entrar con su propia cuenta o usar la demostración local.
 
+## Cuenta compartida y actualizaciones
+
+El móvil es la única autoridad de la cuenta. El reloj ya no crea un saldo ni encuentros DEMO independientes antes del enlace. La demostración local, cuando se utiliza, también pertenece al móvil y se replica al reloj. Cambiar de cuenta o cerrar sesión reemplaza su estado al recibir la actualización; las acciones pendientes de otro propietario se descartan.
+
+La publicación observa los cambios del perfil, favoritos, saldo y apuestas, sin esperar al siguiente sondeo de pantalla. Envía el mismo estado ordenado por MessageClient y DataClient urgente. Las secuencias impiden que un mensaje atrasado reintroduzca los datos de otra cuenta. Las acciones de favoritos también se ordenan, se confirman y se reflejan inmediatamente en la interfaz del reloj mientras esperan respuesta.
+
+El reloj muestra equipos, ligas y encuentros guardados, incluso si sus nombres no están en los partidos del día. En Boletos, cada simple o parlay abre selecciones con partido, mercado, cuota bloqueada, estado y marcador disponible. El resumen conserva hasta treinta boletos, priorizando pendientes, y avisa cuando el historial completo debe consultarse en el móvil.
+
+Las pruebas añadidas cubren cambio de cuenta con revisión menor, mensajes fuera de orden, instalación anterior retirada, descarte de acciones ajenas, favoritos optimistas, acciones atrasadas, conservación de parlays pendientes y límite del resumen. Son pruebas del protocolo y la persistencia; **no sustituyen una prueba del transporte Google entre dispositivos vinculados**.
+
+Las pantallas pobladas de favoritos y detalle de boleto del reloj todavía requieren validar visualmente con una réplica recibida por el enlace real; no se inyectaron datos para presentarlos como una sincronización comprobada.
+
 Los resultados reproducibles y las capturas están en `artifacts/qa/v2/`. Los totales de pruebas y lint se pueden regenerar con `preparar-entrega.py` después de compilar. La evidencia corresponde a esta ejecución; no demuestra cobertura de todos los dispositivos ni disponibilidad permanente del proveedor.
 
 ## Pendiente y límites concretos
 
-- **Vincular móvil y reloj y comprobar el transporte de extremo a extremo.** La cola y las réplicas pasaron pruebas instrumentadas independientes, pero aún no se comprobó el intercambio entre dos dispositivos emparejados. Tener ambos emuladores abiertos no establece la vinculación.
+- **Vincular móvil y reloj y comprobar el transporte de extremo a extremo.** La cola y las réplicas pasaron pruebas instrumentadas independientes, pero aún no se comprobó el intercambio entre dos dispositivos emparejados. El emulador móvil QA actual utiliza una imagen Google APIs sin Play Store ni aplicación complementaria: no cumple los requisitos del asistente de vinculación. Debe usarse un teléfono físico compatible o una imagen con Play Store, y completar Device Manager → Pair Wearable. Tener ambos emuladores abiertos no establece la vinculación.
 - Las notificaciones locales se muestran al observar la liquidación; no hay entrega push FCM garantizada con la aplicación cerrada. El servidor sí puede liquidar independientemente del móvil.
 - La cobertura de ligas, fechas, estadísticas y cuotas depende del plan de API-Football. No se promete información que el proveedor no entregue. La hora visible utiliza la zona local; un partido aplazado o sin estado actualizado puede mostrarse por confirmar.
 - El código multideporte 1.x permanece conservado; en 2.0 el proveedor activo centralizado es fútbol.

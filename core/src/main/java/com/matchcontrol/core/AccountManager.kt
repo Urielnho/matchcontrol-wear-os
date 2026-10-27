@@ -15,7 +15,7 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
  private var session=vault.load()
  private val cache=context.openOrCreateDatabase("remote-v2-cache.db",Context.MODE_PRIVATE,null).apply {execSQL("CREATE TABLE IF NOT EXISTS snapshot(id INTEGER PRIMARY KEY,payload TEXT NOT NULL)")}
  private val json=Json {ignoreUnknownKeys=true;encodeDefaults=true}
- private val mutable=MutableStateFlow(if(session!=null) readCache() ?: Snapshot(balance=0,fixtures=emptyList(),source="API_FOOTBALL") else demo.state.value)
+ private val mutable=MutableStateFlow(if(session!=null) readCache() ?: Snapshot(profile=Profile(id="",displayName=""),balance=0,fixtures=emptyList(),source="API_FOOTBALL") else demo.state.value)
  val state=mutable.asStateFlow()
  private val signed=MutableStateFlow(session!=null)
  val signedIn=signed.asStateFlow()
@@ -38,7 +38,7 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
   val next=if(create) auth.signUp(email.trim(),password) ?: error("Cuenta creada. Confirma el correo antes de iniciar sesión.") else auth.signIn(email.trim(),password)
   session=next;vault.save(next);remote=null;signed.value=true
   // Remove any cached data from a previous account before loading this identity.
-  cache.delete("snapshot",null,null);mutable.value=Snapshot(balance=0,source="API_FOOTBALL")
+  cache.delete("snapshot",null,null);mutable.value=Snapshot(profile=Profile(id="",displayName=""),balance=0,source="API_FOOTBALL")
   refresh()
  }
  fun signOut() {
@@ -52,16 +52,25 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
  fun place(r: BetRequest): Bet=if(signed.value) {val c=client();c.place(r).also {accept(c.state.value)}} else demo.place(r)
  fun reset(id: String) {if(signed.value) {val c=client();c.reset(id);accept(c.state.value)} else demo.reset(id)}
  fun notifications(enabled: Boolean) {if(signed.value) {val c=client();c.notifications(enabled);accept(c.state.value)} else demo.update {it.copy(notifications=enabled)}}
- fun command(c: SyncCommand) {
+ @Synchronized fun command(c: SyncCommand) {
   if(c.profileId.isNotBlank() && (c.profileId!=state.value.profile.id || c.source!=state.value.source)) {demo.update {it.copy(processed=it.processed+c.id)};return}
-  if(!signed.value) {demo.command(c);return}
   if(c.id in demo.state.value.processed) return
+  val order=context.getSharedPreferences("watch-command-order",Context.MODE_PRIVATE)
+  val ordered=c.origin.isNotBlank() && c.sequence>0 && c.action in listOf("team","league","match")
+  val key="${state.value.profile.id}|${state.value.source}|${c.origin}|${c.action}|${c.target}"
+  if(ordered && c.sequence<=order.getLong(key,0)) {demo.update {it.copy(processed=it.processed+c.id)};return}
+  if(!signed.value) {
+   demo.command(c)
+   if(ordered) order.edit().putLong(key,c.sequence).commit()
+   return
+  }
   if(c.action in listOf("team","league","match")) {val remote=client();remote.favorite(c.action,c.target,c.enabled);accept(remote.state.value)}
   else if(c.action=="refresh") refresh()
   else if(c.action=="select") {require(state.value.fixtures.any {it.id==c.target});mutable.update {it.copy(selectedMatch=c.target)}}
   else error("Acción no permitida")
   demo.update {it.copy(processed=it.processed+c.id)}
+  if(ordered) order.edit().putLong(key,c.sequence).commit()
  }
  fun consumeSelection() {if(signed.value) mutable.update {it.copy(selectedMatch=null)} else demo.update {it.copy(selectedMatch=null)}}
- fun authoritySnapshot()=state.value.copy(processed=demo.state.value.processed)
+ fun authoritySnapshot()=state.value.copy(processed=demo.state.value.processed,accountSignedIn=signed.value)
 }

@@ -143,10 +143,11 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
        var stake by rememberSaveable {mutableStateOf("100")};var confirm by remember {mutableStateOf(false)}
        val potential=runCatching {BettingRules.returns(parseCredits(stake),slip.map { it.odds })}.getOrNull()
        LazyColumn(contentPadding=PaddingValues(22.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        item {Heading(if(slip.size>1) "Combinada · ${slip.size} eventos" else "Apuesta simple","Una selección por partido")}
+        item {Heading(if(slip.size>1) "Parlay · ${slip.size} partidos" else "Apuesta simple","Una selección por partido · hasta 10 partidos")}
         if(slip.isEmpty()) {item {Empty("Tu boleto está vacío","Abre un próximo partido y elige un mercado.")};item {Button(onClick={nav.navigate("matches")}) {Text("Explorar partidos")}}}
         items(slip,key={it.id}) {o->val f=state.fixtures.first { it.id==o.matchId };Card(shape=shape,colors=CardDefaults.cardColors(containerColor=Surface)) {Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically) {Column(Modifier.weight(1f)) {Text("${f.home.code} · ${f.away.code}",color=Muted);Text(o.label,fontWeight=FontWeight.Bold);Text("${marketName(o.market)} · ${odds(o.odds)}",fontSize=12.sp,color=Lime)};IconButton(onClick={vm.pick(o)}) {Icon(Icons.Outlined.Close,"Quitar selección")}}} }
         if(slip.isNotEmpty()) {
+         item {OutlinedButton(onClick={nav.navigate("matches") {launchSingleTop=true}},modifier=Modifier.fillMaxWidth()) {Text(if(slip.size==1) "Agregar otro partido · crear parlay" else "Agregar otro partido")}}
          item {Text("Cuota total "+runCatching {BettingRules.totalOdds(slip.map {it.odds}).setScale(2,java.math.RoundingMode.DOWN).toPlainString()}.getOrDefault("—"),fontWeight=FontWeight.SemiBold)}
          item {OutlinedTextField(value=stake,onValueChange={stake=it},label={Text("Créditos virtuales")},supportingText={Text("Disponibles: ${credits(state.balance)} · mínimo 1")},singleLine=true,modifier=Modifier.fillMaxWidth())}
          item {Card(shape=shape,colors=CardDefaults.cardColors(containerColor=Surface)) {Column(Modifier.fillMaxWidth().padding(22.dp)) {Text("RETORNO POTENCIAL",color=Muted,fontSize=12.sp);Text(potential?.let(::credits) ?: "Importe inválido",fontSize=32.sp,color=Lime,fontWeight=FontWeight.Bold);Text("Incluye los créditos apostados",fontSize=12.sp,color=Muted)}}}

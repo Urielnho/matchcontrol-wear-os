@@ -29,6 +29,10 @@ APK móvil: `mobile/build/outputs/apk/debug/mobile-debug.apk`. APK reloj: `app/b
 
 En el móvil, **Perfil** permite iniciar sesión o crear una cuenta. Si el proyecto exige confirmar el correo, hazlo antes de entrar. Sin sesión puedes probar DEMO; su saldo se conserva por separado del saldo de Supabase. La sesión remota se cifra con Android Keystore y no se envía al reloj.
 
+## Armar un parlay
+
+Elige una cuota de un próximo partido y abre el boleto. Pulsa **Agregar otro partido · crear parlay**, selecciona un mercado de otro encuentro y vuelve al boleto. Con dos o más selecciones aparece **Parlay**, con la cuota total y el retorno potencial. Admite hasta diez partidos distintos; se confirma un solo importe de créditos virtuales. Las cuotas reales dependen de la cobertura del proveedor. En DEMO, partidos y cuotas son ficticios y están identificados.
+
 ## Supabase y proveedor deportivo
 
 El proyecto configurado es `vxgvhptsxjjixhaldvor` (`reloj`). La configuración pública del cliente permanece en `local.properties`. La clave deportiva existente se configura como secreto `FOOTBALL_API_KEY` de Edge Functions, nunca como credencial Android.

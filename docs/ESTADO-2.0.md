@@ -25,6 +25,7 @@
 | Interfaz Android real | Cinco secciones, detalle, boleto DEMO, confirmación, persistencia tras reinicio e inicio de sesión remoto |
 | Sin conexión y reconexión | Sesión y encuentros reales conservados tras reiniciar; aviso retirado al recuperar internet |
 | Interfaz Wear OS circular | APK instalado y abierto; pantalla de créditos y boletos comprobada visualmente |
+| Parlay móvil | Dos partidos distintos elegidos desde la interfaz, boleto confirmado y conservado tras reiniciar. Acceso visible para agregar otro partido; límite de diez eventos. |
 
 La prueba financiera alojada cubrió simples, combinada, victoria, derrota, anulación, reintentos sin doble débito ni doble abono, bloqueo de escritura directa de saldo y reinicio explícito. Utilizó eventos QA identificados como DEMO; no alteró resultados reales.
 

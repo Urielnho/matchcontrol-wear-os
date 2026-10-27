@@ -1,0 +1,10 @@
+{
+  "avd": "MatchControl_Mobile_Play",
+  "play_store_installed": true,
+  "demo_bets_restored": 3,
+  "favorite_teams_restored": 1,
+  "balance_preserved": true,
+  "paired": false,
+  "google_sign_in_required": true,
+  "windows_ui_control_available": false
+}

@@ -1,6 +1,6 @@
 {
   "core": {
-    "tests": 29,
+    "tests": 33,
     "failures": 0,
     "errors": 0,
     "skipped": 0
@@ -23,5 +23,10 @@
     "tests": 5,
     "failures": 0
   },
-  "paired_transport_tested": true
+  "paired_transport_tested": true,
+  "final_review": {
+    "session_race_regressions": 4,
+    "mobile_and_wear_build": "passed",
+    "lint_errors": 0
+  }
 }

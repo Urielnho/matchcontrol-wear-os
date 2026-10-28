@@ -29,7 +29,7 @@ for directory in ["app/src", "mobile/src", "core/src", "gradle", "docs", ".run",
     members.update(p for p in (root/directory).rglob("*") if p.is_file() and "__pycache__" not in p.parts)
 for directory in ["backend-tests"]:
     members.update(p for p in (root/directory).iterdir() if p.is_file() and p.suffix in {".json", ".mjs", ".js", ".py"})
-for name in [".gitignore", "build.gradle.kts", "settings.gradle.kts", "gradle.properties", "gradlew", "gradlew.bat", "app/build.gradle.kts", "mobile/build.gradle.kts", "core/build.gradle.kts", "README.md", "VALIDACION.md", "REDISENO.md", "local.properties.example", "supabase/config.toml", "supabase/.env.example", "ejecutar-circular.ps1", "preparar-entrega.py"]:
+for name in [".gitignore", "build.gradle.kts", "settings.gradle.kts", "gradle.properties", "gradlew", "gradlew.bat", "app/build.gradle.kts", "mobile/build.gradle.kts", "core/build.gradle.kts", "README.md", "VALIDACION.md", "REDISENO.md", "local.properties.example", "supabase/config.toml", "supabase/.env.example", "ejecutar-circular.ps1", "ejecutar-matchcontrol.ps1", "preparar-entrega.py"]:
     members.add(root/name)
 with zipfile.ZipFile(out/"Codigo-MatchControl-2.0.zip", "w", zipfile.ZIP_DEFLATED) as archive:
     for path in sorted(members):

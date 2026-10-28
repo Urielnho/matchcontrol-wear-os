@@ -28,7 +28,7 @@ def tap(label,contains=False):
  xy=find(label,contains)
  if not xy:raise RuntimeError("Not visible: "+label)
  adb("shell","input","tap",*xy);time.sleep(.7)
-def size(): return list(map(int,re.findall(r"(\d+)x(\d+)",adb("shell","wm","size").decode())[0]))
+def size(): return list(map(int,re.findall(r"(\d+)x(\d+)",adb("shell","wm","size").decode())[-1]))
 def swipe(up=True):
  w,h=size();adb("shell","input","swipe",w//2,int(h*(.78 if up else .25)),w//2,int(h*(.25 if up else .78)),500);time.sleep(.5)
 def top(steps=2):

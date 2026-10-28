@@ -26,7 +26,7 @@ Las cuotas reales se importan exclusivamente cuando el proveedor las entrega par
 ## Demostración para el profesor
 
 1. En Perfil, activa **Demostración**; sin sesión ya está activo el modo local.
-2. Abre **Laboratorio DEMO → Crear nueva jornada DEMO** si los eventos anteriores ya comenzaron.
+2. Si los eventos anteriores ya comenzaron, pulsa **Crear jornada DEMO** en Inicio o usa **Laboratorio DEMO → Crear nueva jornada DEMO**. Se conservan tu saldo y tus boletos anteriores.
 3. En Partidos, elige Fútbol, Baloncesto, Béisbol y F1. Selecciona un mercado de cada evento; usa **Agregar otro partido** para volver al listado.
 4. El boleto debe mostrar **Parlay · 4 partidos**, la cuota multiplicada y un solo importe de créditos virtuales. Confírmalo.
 5. En el laboratorio, resuelve fútbol, baloncesto y béisbol. El parlay debe continuar pendiente hasta completar la carrera.

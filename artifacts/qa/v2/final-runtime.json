@@ -1,0 +1,44 @@
+{
+  "transport": "Google Wearable Data Layer",
+  "account_matches": true,
+  "balance_matches": true,
+  "favorites_match": true,
+  "tickets_received": 4,
+  "sports_received": [
+    "BASEBALL",
+    "BASKETBALL",
+    "FOOTBALL",
+    "FORMULA1"
+  ],
+  "observed_wait_ms": 154,
+  "balance_and_history_preserved": true,
+  "future_sports": [
+    "BASEBALL",
+    "BASKETBALL",
+    "FOOTBALL",
+    "FORMULA1"
+  ],
+  "future_sports_received_on_watch": [
+    "BASEBALL",
+    "BASKETBALL",
+    "FOOTBALL",
+    "FORMULA1"
+  ],
+  "demo_renewal_from_home": true,
+  "installed_apks_match_release": {
+    "emulator-5556": true,
+    "emulator-5558": true
+  },
+  "timezones": {
+    "emulator-5556": "America/Phoenix",
+    "emulator-5558": "America/Phoenix"
+  },
+  "device_clock_matches_host": {
+    "emulator-5556": true,
+    "emulator-5558": true
+  },
+  "apps_running": {
+    "emulator-5556": true,
+    "emulator-5558": true
+  }
+}

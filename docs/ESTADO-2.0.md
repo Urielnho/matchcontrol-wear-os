@@ -16,7 +16,7 @@
 
 | Alcance | Resultado |
 | --- | --- |
-| JVM core | 29 pruebas aprobadas |
+| JVM core | 33 pruebas aprobadas |
 | JVM reloj, existentes | 31 pruebas aprobadas |
 | Android instrumentado | 5 pruebas aprobadas: SQLite, cola/réplica, cifrado Keystore, cambios de cuenta y orden de favoritos |
 | PostgreSQL local, PGlite con Auth simulado | 37 pruebas aprobadas |
@@ -71,3 +71,13 @@ python preparar-entrega.py
 Las pruebas alojadas requieren acceso administrativo de desarrollo y una cuenta QA separada. `live-smoke.py --financial` modifica exclusivamente sus eventos educativos; no se debe ejecutar como prueba genérica contra cuentas personales.
 
 Las migraciones locales coinciden con las versiones aplicadas al proyecto alojado. No es necesario volver a crear tablas. Los secretos del backend se configuran en Supabase. `local.properties` queda excluido de Git y del paquete; las aplicaciones solo reciben la URL y la clave pública de Supabase.
+
+## Cierre de la versión del 28 de octubre de 2026
+
+La revisión final añadió protección contra respuestas de sesiones anteriores al cerrar o cambiar de cuenta, incluidas renovaciones de tokens atrasadas. Cuatro pruebas de concurrencia verifican que esos resultados no restauran la identidad anterior.
+
+El boleto conserva una salida segura si un evento desaparece, bloquea la confirmación cuando un mercado se cierra o cambia su cuota y actualiza sus horarios mientras la pantalla está abierta. La portada ofrece crear una jornada DEMO cuando no quedan próximos eventos; conserva saldo, favoritos e historial.
+
+ejecutar-matchcontrol.ps1 compila, instala y abre ambos dispositivos, verifica los AVD y conserva los datos. -SinCompilar utiliza los APK existentes y -SinVentana permite verlos desde Running Devices.
+
+La ejecución final verificó que los APK instalados coinciden por SHA-256 con los de entrega, que ambas aplicaciones están abiertas y que los relojes de los emuladores usan America/Phoenix y coinciden con la hora del equipo. Crear una jornada desde Inicio mantuvo los 9,600 créditos y cuatro boletos existentes; los eventos futuros de los cuatro deportes llegaron al reloj. Evidencia: rtifacts/qa/v2/final-runtime.json y capturas premium-final-*.

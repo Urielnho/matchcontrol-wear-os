@@ -27,6 +27,18 @@ $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
 
 APK móvil: `mobile/build/outputs/apk/debug/mobile-debug.apk`. APK reloj: `app/build/outputs/apk/debug/wear-debug.apk`.
 
+Para compilar, instalar y abrir ambos emuladores desde PowerShell:
+
+```powershell
+.\ejecutar-matchcontrol.ps1
+# Si los APK ya están compilados:
+.\ejecutar-matchcontrol.ps1 -SinCompilar
+# Si las ventanas del emulador se bloquean:
+.\ejecutar-matchcontrol.ps1 -SinCompilar -SinVentana
+```
+
+El script utiliza **MatchControl_Mobile_Play** (puerto 5556) y **MatchControl_Round_QA** (5558), verifica su identidad y conserva los datos. Configura la zona de los emuladores como America/Phoenix; puedes cambiarla con -ZonaHoraria. Puedes indicar otros nombres con `-MovilAvd` y `-RelojAvd`. El primer enlace se completa una sola vez en **Device Manager → Pair Wearable**; el script no sustituye ese asistente. Con `-SinVentana`, abre **Running Devices** en Android Studio para verlos.
+
 En el móvil, **Perfil** permite iniciar sesión o crear una cuenta. Si el proyecto exige confirmar el correo, hazlo antes de entrar. Sin sesión puedes probar DEMO; su saldo se conserva por separado del saldo de Supabase. La sesión remota se cifra con Android Keystore y no se envía al reloj.
 
 ## Armar un parlay

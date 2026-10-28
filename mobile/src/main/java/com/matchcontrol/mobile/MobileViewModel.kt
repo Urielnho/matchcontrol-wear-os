@@ -19,7 +19,7 @@ class MobileViewModel(app: Application): AndroidViewModel(app) {
  private val connectivity=app.getSystemService(ConnectivityManager::class.java)
  val online=MutableStateFlow(connectivity.getNetworkCapabilities(connectivity.activeNetwork)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)==true)
  private val networkCallback=object: ConnectivityManager.NetworkCallback() {
-  override fun onCapabilitiesChanged(network: Network,capabilities: NetworkCapabilities) {val connected=capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);val was=online.value;online.value=connected;if(connected && !was && signedIn.value) refresh()}
+  override fun onCapabilitiesChanged(network: Network,capabilities: NetworkCapabilities) {val connected=capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);val was=online.value;online.value=connected;if(connected && !was) refresh()}
   override fun onLost(network: Network) {online.value=connectivity.getNetworkCapabilities(connectivity.activeNetwork)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)==true}
  }
  val loading=MutableStateFlow(false)
@@ -37,6 +37,7 @@ class MobileViewModel(app: Application): AndroidViewModel(app) {
   requestId=newId()
  }
  fun confirm(stake: String,onDone: ()->Unit) {
+ if(!signedIn.value) {message.value="Inicia sesión para confirmar tu boleto";return}
  val request=runCatching {BetRequest(requestId,parseCredits(stake),slip.value.associate {it.id to it.odds})}.getOrElse {message.value="Introduce un importe válido";return}
  act {
   val bet=account.place(request)
@@ -45,20 +46,14 @@ class MobileViewModel(app: Application): AndroidViewModel(app) {
  } }
  private fun withContextOnMain(block: ()->Unit) { viewModelScope.launch(Dispatchers.Main) { block() } }
  fun favorite(action: String,id: String,enabled: Boolean) = act { account.command(SyncCommand(action=action,target=id,enabled=enabled)) }
- fun finish(id: String,home: Int,away: Int)=act {account.demoResult(id,home,away)}
- fun finishRace(id: String,order: List<String>)=act {account.demoResult(id,order=order)}
- fun cancel(id: String)=act {account.demoResult(id,void=true)}
- fun newRound()=act {account.newDemoRound()}
- fun mode(demo: Boolean)=act {account.mode(demo);slip.value=emptyList()}
- fun reset()=act { account.reset(newId()) }
  fun notifications(enabled: Boolean)=act {account.notifications(enabled)}
  fun login(email: String,password: String,create: Boolean)=act {account.signIn(email,password,create);slip.value=emptyList();runCatching {account.loadDate(java.time.LocalDate.now())}.onFailure {message.value="No se pudieron actualizar los partidos. Intenta de nuevo."}}
  fun logout()=act {account.signOut();slip.value=emptyList()}
- fun refresh()=act {account.refresh();account.loadDate(java.time.LocalDate.now());sync.refresh()}
+ fun refresh()=act {account.refresh();if(signedIn.value) account.loadDate(java.time.LocalDate.now());sync.refresh()}
  fun date(date: java.time.LocalDate,sport: SportKind=SportKind.FOOTBALL)=act {account.loadDate(date,sport)}
  fun details(id: String)=act {account.details(id)}
  fun markets(id: String)=act {account.odds(id)}
  fun poll()=act {account.refresh()}
- init {connectivity.registerDefaultNetworkCallback(networkCallback);sync.refresh();if(signedIn.value && online.value) refresh()}
+ init {connectivity.registerDefaultNetworkCallback(networkCallback);sync.refresh();if(online.value) refresh()}
  override fun onCleared() {connectivity.unregisterNetworkCallback(networkCallback);super.onCleared()}
 }

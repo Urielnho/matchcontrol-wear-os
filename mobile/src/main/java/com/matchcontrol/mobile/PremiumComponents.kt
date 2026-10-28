@@ -71,7 +71,7 @@ import coil.compose.AsyncImage
    } else listOf(f.home to f.homeScore,f.away to f.awayScore).forEach { (team,score)->
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {TeamBadge(team);Text(team.name,fontSize=14.sp,modifier=Modifier.weight(1f),maxLines=1);Text(if(f.status==FixtureStatus.SCHEDULED) "—" else score?.toString() ?: "—",fontSize=18.sp,fontWeight=FontWeight.SemiBold)}
    }
-   if(hero || f.sport==SportKind.FORMULA1) Text(time(f.startsAt)+(if(f.source=="DEMO") " · DEMO" else ""),fontSize=11.sp,color=Muted,modifier=Modifier.align(Alignment.CenterHorizontally))
+   if(hero || f.sport==SportKind.FORMULA1 || f.status==FixtureStatus.FINAL) Text(time(f.startsAt),fontSize=11.sp,color=Muted,modifier=Modifier.align(Alignment.CenterHorizontally))
   }
  }
 }
@@ -85,7 +85,7 @@ import coil.compose.AsyncImage
  var expanded by rememberSaveable(b.id) {mutableStateOf(false)}
  Card(onClick={expanded=!expanded},shape=shape,colors=CardDefaults.cardColors(containerColor=Surface)) {
   Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(time(b.createdAt)+(if(b.source=="DEMO") " · DEMO" else ""),fontSize=11.sp,color=Muted);Text(status(b.status),fontSize=12.sp,color=if(b.status==BetStatus.WON) Lime else Muted,fontWeight=FontWeight.SemiBold)}
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(time(b.createdAt),fontSize=11.sp,color=Muted);Text(status(b.status),fontSize=12.sp,color=if(b.status==BetStatus.WON) Lime else Muted,fontWeight=FontWeight.SemiBold)}
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {Column {Text("${credits(b.stake)} créditos",fontSize=19.sp,fontWeight=FontWeight.Bold);Text((if(b.picks.size==1) "1 selección" else "${b.picks.size} selecciones")+" · cuota ${totalOddsLabel(b.totalOdds)}",fontSize=12.sp,color=Muted)};Icon(if(expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,"Detalles del boleto",tint=Muted)}
    if(b.status!=BetStatus.PENDING) Text("Retorno ${credits(b.returned)}",color=if(b.returned>0) Lime else Muted,fontSize=13.sp)
    AnimatedVisibility(expanded) {Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {HorizontalDivider(color=Raised);b.picks.forEach {Text("${it.fixtureLabel} · ${it.label} @ ${odds(it.lockedOdds)}",fontSize=12.sp)};Text("Potencial ${credits(b.potential)} · #${b.id.take(8)}",fontSize=11.sp,color=Muted)}}

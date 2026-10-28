@@ -7,7 +7,7 @@ await db.exec(`create role anon;create role authenticated;create role service_ro
  create function auth.uid() returns uuid language sql as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  grant usage on schema auth,public to anon,authenticated,service_role;grant execute on function auth.uid() to authenticated;
 `);
-for(const file of (await readdir(new URL('../supabase/migrations/',import.meta.url))).filter(x=>x.endsWith('.sql')).sort()) {
+for(const file of (await readdir(new URL('../supabase/migrations/',import.meta.url))).filter(x=>x.endsWith('.sql')&&!x.endsWith('_real_provider_only.sql')).sort()) {
  await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
 }
 const alice='10000000-0000-0000-0000-000000000001',bob='10000000-0000-0000-0000-000000000002';
@@ -117,5 +117,37 @@ const topOffer=(await db.query("select o.* from public.market_outcomes o join pu
 const topTicket=await place(crypto.randomUUID(),100,{[topOffer.id]:18700});
 await finish(topRace,null,null,topRace.participants.map(d=>d.id));
 await check('top ten can lose for an eleventh or twelfth place',async()=>assert.equal(await scalar('select status from public.bets where id=$1',[topTicket]),'LOST'));
+
+// Verify the final real-only migration against a populated historical database.
+const realOnly=(await readdir(new URL('../supabase/migrations/',import.meta.url))).find(x=>x.endsWith('_real_provider_only.sql'));
+await db.exec(await readFile(new URL('../supabase/migrations/'+realOnly,import.meta.url),'utf8'));
+await check('only real data mode can be stored',async()=>assert.rejects(()=>db.query("update public.profiles set data_mode='DEMO' where id=$1",[alice]),/check constraint/));
+await check('historical fictional records remain audit-only',async()=>{assert.ok(await scalar("select count(*)::int from public.matches where source='DEMO'"));const s=await scalar('select public.sandbox_snapshot($1)',[alice]);assert.equal(s.source,'API_FOOTBALL');assert.ok(s.fixtures.every(f=>f.source==='API_FOOTBALL'));assert.ok(s.bets.every(b=>b.source==='API_FOOTBALL'));assert.equal(s.bets.length,0)});
+await db.exec(`insert into public.favorite_teams(user_id,team_id) values('${alice}','demo-driver-0'),('${alice}','api:47') on conflict do nothing`);
+await check('fictional favorites never enter real snapshots',async()=>{const s=await scalar('select public.sandbox_snapshot($1)',[alice]);assert.ok(!s.favoriteTeams.includes('demo-driver-0'));assert.ok(s.favoriteTeams.includes('api:47'))});
+await check('fictional bet retry cannot bypass real-only guard',async()=>assert.rejects(()=>place(request,100),/Only provider/));
+await check('new fictional selection rejected without debit',async()=>assert.rejects(()=>place(crypto.randomUUID(),100,{[topOffer.id]:18700}),/unavailable/));
+await db.exec('set role service_role');
+await check('retired generation RPC cannot be called by application worker',async()=>assert.rejects(()=>db.query('select public.create_multisport_demo($1,$2)',[alice,crypto.randomUUID()]),/permission denied/));
+await check('retired manual result RPC cannot be called by application worker',async()=>assert.rejects(()=>db.query('select public.finish_sandbox_fixture($1,1,0,false)',['m1']),/permission denied/));
+await check('retired reset RPC cannot be called by application worker',async()=>assert.rejects(()=>db.query('select public.reset_demo_wallet($1,$2)',[alice,crypto.randomUUID()]),/permission denied/));
+await db.exec('reset role');
+await check('guest snapshot contains only public sports and no account',async()=>{const s=await scalar("select public.public_scores_snapshot('FOOTBALL',current_date+1,'UTC',null)");assert.equal(s.profile.id,'');assert.equal(s.balance,0);assert.equal(s.bets.length,0);assert.equal(s.transactions.length,0);assert.ok(s.fixtures.every(f=>f.source==='API_FOOTBALL'));assert.equal(s.favoriteTeams.length,0)});
+await check('guest date window is bounded',async()=>assert.rejects(()=>scalar("select public.public_scores_snapshot('FOOTBALL',current_date+8,'UTC',null)"),/Unsupported sports date/));
+await check('anonymous SQL caller cannot bypass feed wrapper',async()=>{await db.exec('set role anon');try {await assert.rejects(()=>scalar("select public.public_scores_snapshot('FOOTBALL',current_date,'UTC',null)"),/permission denied/)} finally {await db.exec('reset role')}});
+await check('authenticated direct fixtures hide old fictional events',async()=>{await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${alice}',false);`);try {assert.equal(await scalar("select count(*)::int from public.matches where source='DEMO'"),0);assert.equal(await scalar('select public.sandbox_snapshot($1)',[bob]),null)}finally {await db.exec('reset role')}});
+
+await check('real provider bets continue to place and retain exact odds',async()=>{
+ const game={...providerFixture,fixture:{...providerFixture.fixture,id:12346}};
+ await db.query('select public.ingest_football($1,$2)',[JSON.stringify([game]),new Date().toISOString()]);
+ await db.query('select public.ingest_football_odds($1)',[JSON.stringify([{fixture:{id:12346},bookmakers:[{bets:[{id:1,values:[{value:'Home',odd:'1.85'}]}]}]}])]);
+ const o=await scalar("select o.id from public.market_outcomes o join public.markets m on m.id=o.market_id where m.match_id='api:12346'");
+ const bet=await scalar('select public.place_demo_bet($1,$2,100,$3)',[alice,crypto.randomUUID(),JSON.stringify({[o]:18500})]);
+ const snapshot=await scalar('select public.sandbox_snapshot($1)',[alice]);assert.equal(snapshot.bets.length,1);assert.equal(snapshot.bets[0].id,bet);assert.equal(snapshot.bets[0].source,'API_FOOTBALL');assert.equal(snapshot.bets[0].potential,18500);
+ const detail=await scalar("select public.public_scores_snapshot('FOOTBALL',current_date,'UTC','api:12346')");assert.equal(detail.fixtures.length,1);
+ await db.query("select public.provider_quote_time('api:12346',now()-interval '31 minutes')");
+ const stale=await scalar("select public.public_scores_snapshot('FOOTBALL',current_date,'UTC','api:12346')");assert.equal(stale.outcomes[0].open,false);
+ await assert.rejects(()=>scalar('select public.place_demo_bet($1,$2,100,$3)',[alice,crypto.randomUUID(),JSON.stringify({[o]:18500})]),/Stale/);
+});
 console.log(JSON.stringify({passed,failed:0,engine:'PGlite PostgreSQL; auth schema mocked, no Supabase deployment'}));
 await db.close();

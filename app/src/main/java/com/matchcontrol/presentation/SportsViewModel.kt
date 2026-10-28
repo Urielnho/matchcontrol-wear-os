@@ -19,7 +19,7 @@ class SportsViewModel(app: Application): AndroidViewModel(app) {
  fun choose(sport: Sport) { job?.cancel();detailJob?.cancel();mutable.value=SportsState(sport=sport);refresh() }
  fun day(offset: Long) { detailJob?.cancel();mutable.update { it.copy(date=it.date.plusDays(offset),events=emptyList(),detail=null,detailLoading=false,updated=0,stale=false) };refresh() }
  fun refresh(force: Boolean=false) {
-  mutable.update { it.copy(loading=false,events=emptyList(),error="En DEMO solo está disponible fútbol. Otros deportes requieren el backend configurado.") }
+  mutable.update { it.copy(loading=false,events=emptyList(),error="Abre este deporte en el móvil para cargar resultados.") }
   return
   @Suppress("UNREACHABLE_CODE")
   job?.cancel();val initial=mutable.value

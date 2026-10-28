@@ -1,0 +1,26 @@
+{
+  "sports": {
+    "FOOTBALL": {
+      "provider_events": 500,
+      "screen_checked": true
+    },
+    "BASKETBALL": {
+      "provider_events": 138,
+      "screen_checked": true
+    },
+    "BASEBALL": {
+      "provider_events": 14,
+      "screen_checked": true
+    },
+    "FORMULA1": {
+      "provider_events": 23,
+      "screen_checked": true
+    }
+  },
+  "no_practice_ui": true,
+  "guest_finances_empty": true,
+  "profile_has_no_practice_controls": true,
+  "guest_has_no_generated_tickets": true,
+  "real_favorite_received_on_watch": true,
+  "favorite_change_restored": true
+}

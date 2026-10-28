@@ -33,16 +33,17 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
  private var session=vault.load()
  private val cache=context.openOrCreateDatabase("remote-v2-cache.db",Context.MODE_PRIVATE,null).apply {execSQL("CREATE TABLE IF NOT EXISTS snapshot(id INTEGER PRIMARY KEY,payload TEXT NOT NULL)")}
  private val json=Json {ignoreUnknownKeys=true;encodeDefaults=true}
- private val mutable=MutableStateFlow(if(session!=null) readCache() ?: Snapshot(profile=Profile(id="",displayName=""),balance=0,fixtures=emptyList(),source="API_FOOTBALL") else demo.state.value)
+ private val mutable=MutableStateFlow(if(session!=null) readCache() ?: RealData.guest() else RealData.guest(demo.state.value))
  val state=mutable.asStateFlow()
  private val signed=MutableStateFlow(session!=null)
  val signedIn=signed.asStateFlow()
  val configured get()=config!=null
  @Volatile private var remote: RemoteRepository?=null
- private fun readCache(): Snapshot?=cache.rawQuery("SELECT payload FROM snapshot WHERE id=1",null).use {if(it.moveToFirst()) json.decodeFromString<Snapshot>(it.getString(0)) else null}
- private fun accept(client: RemoteRepository,s: Snapshot) = sessions.locked {
+ private fun readCache(): Snapshot?=cache.rawQuery("SELECT payload FROM snapshot WHERE id=1",null).use {if(it.moveToFirst()) RealData.only(json.decodeFromString<Snapshot>(it.getString(0))) else null}
+ private fun accept(client: RemoteRepository,received: Snapshot) = sessions.locked {
   // A response belongs to the exact client/session that issued it, even across the same user signing in again.
   if(!signed.value || client!==remote) return@locked
+  val s=RealData.only(received)
   val old=mutable.value
   if(s.profile.id==old.profile.id && s.revision<old.revision) return@locked
   cache.insertWithOnConflict("snapshot",null,ContentValues().apply {put("id",1);put("payload",json.encodeToString(s))},android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE)
@@ -60,7 +61,14 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
   check(signed.value && session!=null) {"Inicia sesión de nuevo"}
   remote ?: RemoteRepository(requireNotNull(config) {"Servicio no configurado"},{token(epoch)}).also {remote=it}
  }
- init {scope.launch {demo.state.collect {s->sessions.locked {if(!signed.value) mutable.value=s}}}}
+ private fun guestFetch(action: String,sport: SportKind,date: LocalDate=LocalDate.now(),id: String?=null) {
+  val epoch=sessions.capture()
+  val received=PublicScoresRepository(requireNotNull(config) {"Los resultados no están configurados"}).fetch(action,sport,date,id)
+  sessions.commit(epoch) {if(!signed.value) {mutable.value=demo.update {RealData.mergeGuest(it,received)}}}
+ }
+ private fun sportOf(id: String)=when {id.startsWith("basket:")->SportKind.BASKETBALL;id.startsWith("base:")->SportKind.BASEBALL;id.startsWith("f1:")->SportKind.FORMULA1;else->SportKind.FOOTBALL}
+ private fun dateOf(id: String)=if(id.startsWith("f1:")) LocalDate.now() else state.value.fixtures.firstOrNull {it.id==id}?.let {java.time.Instant.ofEpochMilli(it.startsAt).atZone(java.time.ZoneId.systemDefault()).toLocalDate()} ?: LocalDate.now()
+ init {scope.launch {demo.state.collect {s->sessions.locked {if(!signed.value) mutable.value=RealData.guest(s)}}}}
  fun signIn(email: String,password: String,create: Boolean=false) {
   require(email.contains('@') && password.length>=6) {"Revisa el correo y la contraseña (mínimo 6 caracteres)"}
   val auth=SupabaseAuth(requireNotNull(config) {"Inicio de sesión no disponible"})
@@ -69,7 +77,7 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
   sessions.requireCurrent(attempt) {
    vault.save(next);session=next;remote=null
    // Remove any cached data from a previous account before loading this identity.
-   cache.delete("snapshot",null,null);mutable.value=Snapshot(profile=Profile(id="",displayName=""),balance=0,source="API_FOOTBALL");signed.value=true
+   cache.delete("snapshot",null,null);mutable.value=RealData.guest();signed.value=true
   }
   refresh()
  }
@@ -77,34 +85,27 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
   var oldToken: String?=null
   sessions.advance {
    oldToken=session?.access_token;vault.clear();session=null;remote=null
-   cache.delete("snapshot",null,null);signed.value=false;mutable.value=demo.state.value
+   cache.delete("snapshot",null,null);signed.value=false;mutable.value=RealData.guest(demo.state.value)
   }
   oldToken?.let {if(config!=null) runCatching {SupabaseAuth(requireNotNull(config)).signOut(it)}}
  }
- fun refresh() {if(signed.value) {val c=client();c.refresh();accept(c,c.state.value)} else sessions.locked {if(!signed.value) mutable.value=demo.state.value}}
- fun loadDate(date: LocalDate,sport: SportKind=SportKind.FOOTBALL) {if(signed.value && state.value.source!="DEMO") {val c=client();try {c.fetchSportDate(date,sport)} finally {c.refresh();accept(c,c.state.value)}}}
- fun details(id: String) {if(signed.value && state.value.source!="DEMO") {val c=client();try {c.fetchDetail(id)} finally {c.refresh();accept(c,c.state.value)}}}
- fun odds(id: String) {if(signed.value && state.value.source!="DEMO") {val c=client();try {c.fetchOdds(id)} finally {c.refresh();accept(c,c.state.value)}}}
- fun mode(demoMode: Boolean) {check(signed.value);val c=client();c.mode(demoMode);accept(c,c.state.value)}
- fun newDemoRound() {check(state.value.source=="DEMO");if(signed.value) {val c=client();c.newDemoRound();accept(c,c.state.value)} else demo.update {DemoLab.newRound(it)}}
- fun demoResult(id: String,home: Int?=null,away: Int?=null,order: List<String>?=null,void: Boolean=false) {
-  check(state.value.source=="DEMO") {"Solo se modifican eventos DEMO"}
-  if(signed.value) {val c=client();c.demoResult(id,home,away,order,void);accept(c,c.state.value)}
-  else demo.update {when {void->DemoLab.cancel(it,id);order!=null->DemoLab.finishRace(it,id,order);else->DemoLab.finish(it,id,requireNotNull(home),requireNotNull(away))}}
- }
- fun place(r: BetRequest): Bet=if(signed.value) {val c=client();c.place(r).also {accept(c,c.state.value)}} else demo.place(r)
- fun reset(id: String) {if(signed.value) {val c=client();c.reset(id);accept(c,c.state.value)} else demo.reset(id)}
+ fun refresh() {if(signed.value) {val c=client();c.refresh();accept(c,c.state.value)} else guestFetch("events",SportKind.FOOTBALL)}
+ fun loadDate(date: LocalDate,sport: SportKind=SportKind.FOOTBALL) {if(signed.value) {val c=client();try {c.fetchSportDate(date,sport)} finally {c.refresh();accept(c,c.state.value)}} else guestFetch("events",sport,date)}
+ fun details(id: String) {require(RealData.isEvent(id));if(signed.value) {val c=client();try {c.fetchDetail(id)} finally {c.refresh();accept(c,c.state.value)}} else guestFetch("details",sportOf(id),dateOf(id),id)}
+ fun odds(id: String) {require(RealData.isEvent(id));if(signed.value) {val c=client();try {c.fetchOdds(id)} finally {c.refresh();accept(c,c.state.value)}} else guestFetch("odds",sportOf(id),dateOf(id),id)}
+ fun place(r: BetRequest): Bet {check(signed.value) {"Inicia sesión para confirmar tu boleto"};val c=client();return c.place(r).also {accept(c,c.state.value)}}
  fun notifications(enabled: Boolean) {if(signed.value) {val c=client();c.notifications(enabled);accept(c,c.state.value)} else demo.update {it.copy(notifications=enabled)}}
  @Synchronized fun command(c: SyncCommand) {
   val epoch=sessions.capture()
-  if(c.profileId.isNotBlank() && (c.profileId!=state.value.profile.id || c.source!=state.value.source)) {demo.update {it.copy(processed=it.processed+c.id)};return}
+  if((c.profileId.isNotBlank() || c.origin.isNotBlank()) && (c.profileId!=state.value.profile.id || c.source!=state.value.source)) {demo.update {it.copy(processed=it.processed+c.id)};return}
   if(c.id in demo.state.value.processed) return
   val order=context.getSharedPreferences("watch-command-order",Context.MODE_PRIVATE)
   val ordered=c.origin.isNotBlank() && c.sequence>0 && c.action in listOf("team","league","match")
   val key="${state.value.profile.id}|${state.value.source}|${c.origin}|${c.action}|${c.target}"
   if(ordered && c.sequence<=order.getLong(key,0)) {demo.update {it.copy(processed=it.processed+c.id)};return}
   if(!signed.value) {
-   sessions.requireCurrent(epoch) {demo.command(c);if(ordered) order.edit().putLong(key,c.sequence).commit()}
+   when(c.action) {"refresh"->refresh();"sport"->loadDate(LocalDate.now(),SportKind.valueOf(c.target));else->sessions.requireCurrent(epoch) {demo.command(c)}}
+   sessions.commit(epoch) {demo.update {it.copy(processed=it.processed+c.id)};if(ordered) order.edit().putLong(key,c.sequence).commit()}
    return
   }
   if(c.action in listOf("team","league","match")) {val remote=client(epoch);remote.favorite(c.action,c.target,c.enabled);accept(remote,remote.state.value)}
@@ -115,5 +116,5 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
   sessions.commit(epoch) {demo.update {it.copy(processed=it.processed+c.id)};if(ordered) order.edit().putLong(key,c.sequence).commit()}
  }
  fun consumeSelection()=sessions.locked {if(signed.value) mutable.update {it.copy(selectedMatch=null)} else demo.update {it.copy(selectedMatch=null)}}
- fun authoritySnapshot()=sessions.locked {state.value.copy(processed=demo.state.value.processed,accountSignedIn=signed.value)}
+ fun authoritySnapshot()=sessions.locked {RealData.only(state.value).copy(processed=demo.state.value.processed,accountSignedIn=signed.value)}
 }

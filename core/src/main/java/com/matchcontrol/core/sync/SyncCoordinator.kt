@@ -54,7 +54,7 @@ class SyncCoordinator(private val context: Context,val repository: DemoRepositor
  fun changed() { scope.launch { runCatching { publish() }.onFailure { mutable.value=mutable.value.copy(message="Cambios guardados; sincronización pendiente") } } }
  @Synchronized fun command(command: SyncCommand) {
   if(repository.authority) scope.launch {commandLock.withLock {authorityCommand(command)};changed()}
-  else if(!repository.hasReplica() || repository.state.value.profile.id.isBlank()) mutable.value=mutable.value.copy(message="Vincula el móvil para usar su cuenta")
+  else if(!repository.hasReplica() || repository.state.value.fixtures.isEmpty()) mutable.value=mutable.value.copy(message="Abre el móvil para cargar resultados")
   else {
    val sequence=syncPrefs.getLong("command-sequence",0)+1
    syncPrefs.edit().putLong("command-sequence",sequence).commit()
@@ -136,9 +136,13 @@ object AppGraph {
  }
 }
 class MatchSyncService: WearableListenerService() {
+ private fun coordinator(): SyncCoordinator {
+  if(AppGraph.repository(applicationContext).authority) AppGraph.account(applicationContext)
+  return AppGraph.sync(applicationContext)
+ }
  override fun onDataChanged(events: DataEventBuffer) {
   // Consume buffer before the callback returns; never retain released DataItems.
-  runBlocking(Dispatchers.IO) { events.forEach { if(it.type==DataEvent.TYPE_CHANGED) runCatching { AppGraph.sync(applicationContext).handleData(it.dataItem) } } }
+  runBlocking(Dispatchers.IO) { events.forEach { if(it.type==DataEvent.TYPE_CHANGED) runCatching { coordinator().handleData(it.dataItem) } } }
  }
- override fun onMessageReceived(event: MessageEvent) { runBlocking(Dispatchers.IO) { runCatching { AppGraph.sync(applicationContext).handleMessage(event) } } }
+ override fun onMessageReceived(event: MessageEvent) { runBlocking(Dispatchers.IO) { runCatching { coordinator().handleMessage(event) } } }
 }

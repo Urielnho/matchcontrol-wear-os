@@ -9,7 +9,7 @@ import java.net.URL
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** Prepared adapter, explicitly opt-in. Never constructed by the DEMO graph. */
+/** Provider reads and authenticated account operations use the same trusted backend. */
 data class RemoteConfig(val baseUrl: String,val publishableKey: String) {
  init {require(baseUrl.startsWith("https://"));require(publishableKey.isNotBlank())}
 }
@@ -54,9 +54,6 @@ class RemoteRepository(private val config: RemoteConfig,private val accessToken:
   refresh()
  }
  fun notifications(enabled: Boolean) {mutable.value=json.decodeFromJsonElement(invoke(buildJsonObject {put("action","notifications");put("enabled",enabled)}))}
- fun mode(demo: Boolean) {mutable.value=json.decodeFromJsonElement(invoke(buildJsonObject {put("action","mode");put("source",if(demo) "DEMO" else "API_FOOTBALL")}))}
- fun newDemoRound() {mutable.value=json.decodeFromJsonElement(invoke(buildJsonObject {put("action","demoRound");put("requestId",newId())}))}
- fun demoResult(id: String,home: Int?=null,away: Int?=null,order: List<String>?=null,void: Boolean=false) {mutable.value=json.decodeFromJsonElement(invoke(buildJsonObject {put("action","demoResult");put("matchId",id);home?.let {put("home",it)};away?.let {put("away",it)};order?.let {put("order",json.encodeToJsonElement(it))};put("void",void)}))}
  override fun matches()=mutable.value.fixtures
  override fun results()=matches().filter {it.status==FixtureStatus.FINAL}
  override fun markets(matchId: String)=mutable.value.outcomes.filter {it.matchId==matchId}
@@ -71,6 +68,16 @@ class RemoteRepository(private val config: RemoteConfig,private val accessToken:
  }
  override fun reset(requestId: String) {mutable.value=json.decodeFromJsonElement(invoke(buildJsonObject {put("action","reset");put("requestId",requestId)}))}
  fun favorite(kind: String,target: String,enabled: Boolean) {mutable.value=json.decodeFromJsonElement(invoke(buildJsonObject {put("action","favorite");put("kind",kind);put("target",target);put("enabled",enabled)}))}
+}
+
+class PublicScoresRepository(private val config: RemoteConfig) {
+ private val json=Json {ignoreUnknownKeys=true;encodeDefaults=true}
+ fun fetch(action: String,sport: SportKind,date: LocalDate=LocalDate.now(),id: String?=null): Snapshot {
+  require(action in setOf("events","details","odds"))
+  if(id!=null) require(RealData.isEvent(id)) {"Evento no disponible"}
+  val body=buildJsonObject {put("action",action);put("sport",sport.name);put("date",date.toString());put("timezone",ZoneId.systemDefault().id);id?.let {put("id",it)}}
+  return RealData.guest(json.decodeFromString(requestJson(config,"/functions/v1/scores",body,null)))
+ }
 }
 
 private fun requestJson(config: RemoteConfig,path: String,body: JsonObject,token: String?): String {

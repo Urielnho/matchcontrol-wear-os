@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 
-/** A SQLite transaction serializes the entire bounded educational aggregate. */
+/** Local provider cache and paired-device replica. Legacy database names are retained for upgrades. */
 class DemoRepository(private val context: Context,val authority: Boolean,private val databaseName: String="matchcontrol-v2.db"): MatchesRepository,ResultsRepository,OddsRepository,UsersRepository,WalletsRepository,BetsRepository,HistoryRepository {
  private val db=object:SQLiteOpenHelper(context,databaseName,null,1) {
   override fun onCreate(db: SQLiteDatabase) { db.execSQL("CREATE TABLE state(id INTEGER PRIMARY KEY CHECK(id=1),payload TEXT NOT NULL)");db.execSQL("CREATE TABLE outbox(id TEXT PRIMARY KEY,payload TEXT NOT NULL)") }
@@ -19,14 +19,13 @@ class DemoRepository(private val context: Context,val authority: Boolean,private
  private fun write(s: Snapshot) { check(db.writableDatabase.insertWithOnConflict("state",null,ContentValues().apply { put("id",1);put("payload",json.encodeToString(s)) },SQLiteDatabase.CONFLICT_REPLACE)!=-1L) {"No se pudo guardar el estado"} }
  private fun initial(): Snapshot {
   val saved=read()
-  if(saved!=null) {
-   if(authority && saved.fixtures.none {it.sport!=SportKind.FOOTBALL}) {
-    val extra=MultiSportDemo.seed(System.currentTimeMillis())
-    return saved.copy(fixtures=saved.fixtures+extra.first,outcomes=saved.outcomes+extra.second,revision=saved.revision+1).also(::write)
-   }
-   return MultiSportDemo.upgrade(saved).also {if(it!=saved) write(it)}
+  val clean=if(authority) RealData.guest(saved) else saved?.let(RealData::only) ?: RealData.guest()
+  // Preserve the old file as an inaccessible upgrade backup rather than deleting financial history.
+  if(saved!=null && saved!=clean) context.openOrCreateDatabase("legacy-practice-archive.db",Context.MODE_PRIVATE,null).use {archive->
+   archive.execSQL("CREATE TABLE IF NOT EXISTS snapshot(id INTEGER PRIMARY KEY,payload TEXT NOT NULL)")
+   archive.insertWithOnConflict("snapshot",null,ContentValues().apply {put("id",1);put("payload",json.encodeToString(saved))},SQLiteDatabase.CONFLICT_IGNORE)
   }
-  return (if(authority) DemoEngine.seed() else Snapshot(profile=Profile(id="",displayName=""),balance=0)).also(::write)
+  return clean.also(::write)
  }
  private val mutable=MutableStateFlow(initial())
  val state=mutable.asStateFlow()
@@ -35,19 +34,21 @@ class DemoRepository(private val context: Context,val authority: Boolean,private
  @Synchronized fun update(block: (Snapshot)->Snapshot): Snapshot {
   check(authority) { "El reloj es una réplica; confirma operaciones desde el móvil" }
   val database=db.writableDatabase;database.beginTransaction()
-  val result=try { val old=read()!!;val next=block(old).let { if(it==old) old else it.copy(revision=old.revision+1,updatedAt=System.currentTimeMillis()) };write(next);database.setTransactionSuccessful();next } finally { database.endTransaction() }
+  val result=try { val old=read()!!;val next=RealData.guest(block(old)).let { if(it==old) old else it.copy(revision=old.revision+1,updatedAt=System.currentTimeMillis()) };write(next);database.setTransactionSuccessful();next } finally { database.endTransaction() }
   val previous=mutable.value;mutable.value=result;runCatching {ResultAlerts.changed(context,previous,result)};return result
  }
- @Synchronized fun applySnapshot(snapshot: Snapshot) {
+ @Synchronized fun applySnapshot(receivedSnapshot: Snapshot) {
   check(!authority)
+  val snapshot=RealData.only(receivedSnapshot)
   // First authoritative snapshot replaces a seeded preview, then revisions are monotonic.
   val received=contextPreferences.getBoolean("received",false)
   if(received && snapshot.profile.id==mutable.value.profile.id && snapshot.source==mutable.value.source && snapshot.revision<mutable.value.revision) return
   val previous=mutable.value;write(snapshot);mutable.value=snapshot;contextPreferences.edit().putBoolean("received",true).apply();runCatching {ResultAlerts.changed(context,previous,snapshot)}
  }
  private val contextPreferences=context.getSharedPreferences("v2-replica-$databaseName",Context.MODE_PRIVATE)
- @Synchronized fun applyMirror(frame: MirrorFrame): Boolean {
+ @Synchronized fun applyMirror(receivedFrame: MirrorFrame): Boolean {
   check(!authority)
+  val frame=receivedFrame.copy(snapshot=RealData.only(receivedFrame.snapshot))
   require(frame.authorityId.isNotBlank() && frame.sequence>0)
   val epoch=contextPreferences.getString("authority",null)
   val retired=contextPreferences.getStringSet("retired",emptySet()).orEmpty()
@@ -71,8 +72,8 @@ class DemoRepository(private val context: Context,val authority: Boolean,private
  override fun balance()=state.value.balance
  override fun history()=state.value.bets
  override fun movements()=state.value.transactions
- override fun place(request: BetRequest): Bet { var bet: Bet?=null;update { val result=DemoEngine.place(it,request);bet=result.second;result.first };return requireNotNull(bet) }
- override fun reset(requestId: String) { update { DemoEngine.reset(it,requestId) } }
+ override fun place(request: BetRequest): Bet = error("Inicia sesión en el móvil para confirmar tu boleto")
+ override fun reset(requestId: String) {error("El saldo se administra en tu cuenta")}
  fun command(c: SyncCommand) { update { s->
   if(c.id in s.processed) s else {
    require(c.action in setOf("team","league","match","select","refresh","sport")) { "Acción no permitida" }

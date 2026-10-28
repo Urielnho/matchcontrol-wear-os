@@ -8,6 +8,9 @@ android {
  compileSdk = 36
  defaultConfig { minSdk = 26; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
  compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+ // Synthetic fixtures exist only in verification builds, never in the applications.
+ sourceSets.getByName("test").java.srcDir("src/testData/java")
+ sourceSets.getByName("androidTest").java.srcDir("src/testData/java")
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
 dependencies {

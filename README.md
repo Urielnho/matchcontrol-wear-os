@@ -1,80 +1,47 @@
-# MatchControl 2.0
+﻿# MatchControl 2.1
 
-Android y Wear OS para consultar fútbol, baloncesto, béisbol y F1, seguir equipos o pilotos y gestionar apuestas educativas con créditos virtuales. No hay dinero real, depósitos, retiros ni premios canjeables.
+Aplicación Android y Wear OS con eventos y resultados reales de fútbol, baloncesto, béisbol y Fórmula 1. Los equipos, calendarios, marcadores, clasificaciones y cuotas proceden de los proveedores deportivos. La aplicación no genera encuentros, resultados ni precios.
 
-## Aplicaciones
+Las apuestas y los parlays utilizan créditos virtuales. No hay dinero real, depósitos, retiros ni premios canjeables.
 
-- **mobile:** interfaz Material 3, partidos, detalles, mercados, boleto, apuestas, favoritos, perfil y billetera.
-- **wear:** conserva el proyecto del reloj en el directorio `app/`, con navegación circular, favoritos, resumen de créditos y boletos, envío de partidos al móvil y sincronización.
-- **core:** contratos, motor decimal sandbox, SQLite, sesión cifrada, adaptadores remotos y protocolo Data Layer.
+## Ejecutar
 
-Sin sesión se utiliza **DEMO local**, con partidos y cuotas ficticios identificados. El perfil comienza con 10,000 créditos; permite confirmar y liquidar boletos sin internet mediante el laboratorio separado de las pantallas normales. Los reintentos no duplican descuentos ni retornos.
+Abre esta carpeta en Android Studio y espera a que termine Gradle Sync. Usa el JDK integrado. La configuración pública de Supabase está en local.properties y permanece excluida de Git. La clave deportiva se guarda únicamente en el servidor.
 
-Con sesión se consulta **Supabase**, que es la autoridad de perfiles, saldo y apuestas. El servidor comparte la caché de API-Football entre móvil y reloj. Los partidos reales y las cuotas disponibles se normalizan; si el plan no ofrece cuotas, se informa sin inventarlas. Los boletos utilizan únicamente créditos virtuales, incluso con encuentros reales.
+Desde PowerShell, ejecuta:
 
-## Ejecutar en Android Studio
+    .\ejecutar-matchcontrol.ps1
 
-1. Abre esta carpeta y espera a que termine Gradle Sync. Usa el JDK integrado de Android Studio.
-2. Copia `local.properties.example` como `local.properties` y configura la URL y la clave **publicable** de tu proyecto. Android Studio registra la ruta del SDK.
-3. Selecciona **mobile** y un teléfono Android para ejecutarlo. Selecciona **wear** y un reloj Wear OS para la otra aplicación.
-4. Ambas aplicaciones utilizan `com.matchcontrol` y la misma firma de desarrollo, como exige Wearable Data Layer. Se instalan en dispositivos distintos.
+Con los APK ya compilados:
 
-```powershell
-$env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
-.\gradlew.bat :mobile:assembleDebug :wear:assembleDebug
-.\gradlew.bat :core:testDebugUnitTest :wear:testDebugUnitTest
-```
+    .\ejecutar-matchcontrol.ps1 -SinCompilar
 
-APK móvil: `mobile/build/outputs/apk/debug/mobile-debug.apk`. APK reloj: `app/build/outputs/apk/debug/wear-debug.apk`.
+El script abre MatchControl_Mobile_Play y MatchControl_Round_QA, comprueba los dispositivos y conserva los datos. Permite -SinVentana para usar Running Devices y -ZonaHoraria para cambiar America/Phoenix. El primer enlace se completa con Device Manager → Pair Wearable.
 
-Para compilar, instalar y abrir ambos emuladores desde PowerShell:
+También puedes ejecutar los módulos mobile y wear por separado desde Android Studio. Ambos usan com.matchcontrol y la misma firma, instalados en dispositivos diferentes.
 
-```powershell
-.\ejecutar-matchcontrol.ps1
-# Si los APK ya están compilados:
-.\ejecutar-matchcontrol.ps1 -SinCompilar
-# Si las ventanas del emulador se bloquean:
-.\ejecutar-matchcontrol.ps1 -SinCompilar -SinVentana
-```
+## Usar la aplicación
 
-El script utiliza **MatchControl_Mobile_Play** (puerto 5556) y **MatchControl_Round_QA** (5558), verifica su identidad y conserva los datos. Configura la zona de los emuladores como America/Phoenix; puedes cambiarla con -ZonaHoraria. Puedes indicar otros nombres con `-MovilAvd` y `-RelojAvd`. El primer enlace se completa una sola vez en **Device Manager → Pair Wearable**; el script no sustituye ese asistente. Con `-SinVentana`, abre **Running Devices** en Android Studio para verlos.
+- Sin iniciar sesión puedes consultar los resultados reales, explorar deportes y guardar favoritos. No se crea un saldo ni una cuenta de práctica.
+- En Perfil puedes iniciar sesión o crear tu cuenta. El reloj comparte esa identidad, favoritos, créditos y boletos.
+- Para apostar, abre un evento próximo con cuotas publicadas, elige una selección y abre el boleto. Agregar otro partido permite formar un parlay de hasta diez eventos distintos.
+- La confirmación necesita una cuenta. Se bloquea si el evento comienza, cierra el mercado o cambia su cuota. Los créditos y la liquidación se controlan en el servidor.
+- Un resultado pendiente o no verificado no se inventa ni se liquida manualmente.
 
-En el móvil, **Perfil** permite iniciar sesión o crear una cuenta. Si el proyecto exige confirmar el correo, hazlo antes de entrar. Sin sesión puedes probar DEMO; su saldo se conserva por separado del saldo de Supabase. La sesión remota se cifra con Android Keystore y no se envía al reloj.
+## Cobertura real
 
-## Armar un parlay
+Fútbol, baloncesto y béisbol utilizan API-SPORTS. Fórmula 1 utiliza Jolpica para calendario y clasificaciones. Solo se ofrecen mercados y cuotas que el proveedor publique y que la aplicación pueda interpretar correctamente.
 
-Elige una cuota de un próximo partido y abre el boleto. Pulsa **Agregar otro partido · crear parlay**, selecciona un mercado de otro encuentro y vuelve al boleto. Con dos o más selecciones aparece **Parlay**, con la cuota total y el retorno potencial. Admite hasta diez partidos distintos; se confirma un solo importe de créditos virtuales. Las cuotas reales dependen de la cobertura del proveedor. En DEMO, partidos y cuotas son ficticios y están identificados.
+El proveedor de F1 no ofrece cuotas: se muestran sus carreras y clasificaciones, sin inventar mercados. La cobertura del resto de deportes depende del plan y de la disponibilidad del proveedor. Si no hay datos o cuotas, la pantalla lo indica.
 
-El parlay puede mezclar los cuatro deportes, con una selección por evento. En **Perfil → Resultados → Demostración** se activan eventos educativos privados para probar todos los mercados y resolverlos desde el laboratorio, usando la misma cuenta de Supabase. F1 utiliza ganador, podio y top 10 con doce pilotos ficticios; los datos reales de F1 no incluyen cuotas. [Reglas y recorrido para presentar](docs/MULTIDEPORTE.md).
+Los resultados públicos no requieren sesión. Las consultas usan caché compartida, fechas e identificadores permitidos y un presupuesto de solicitudes. Las claves privadas no están en los APK.
 
-## Supabase y proveedor deportivo
+## Entrega y verificación
 
-El proyecto configurado es `vxgvhptsxjjixhaldvor` (`reloj`). La configuración pública del cliente permanece en `local.properties`. La clave deportiva existente se configura como secreto `FOOTBALL_API_KEY` de Edge Functions, nunca como credencial Android.
+Los APK, código y capturas actuales se generan en entrega/MatchControl-2.1 con:
 
-`supabase/migrations/` contiene tablas, índices, RLS, restricciones y operaciones atómicas. Las funciones usan `@supabase/server` con autenticación HTTP; toman el usuario del JWT validado, no de un ID libre enviado por el cliente. El cliente administrativo se reserva a las operaciones privilegiadas ya autorizadas.
+    python preparar-entrega.py
 
-- `sandbox`: estado de cuenta, boletos, reinicio explícito del saldo y favoritos.
-- `football`: proxy, caché, cuota diaria y normalización de fixtures y cuotas.
-- `sports`: baloncesto y béisbol con la misma clave API-SPORTS, y calendario/clasificación de F1 mediante Jolpica. Caché compartida y normalización de mercados compatibles.
-- `settle-sandbox`: proceso privado de resultados DEMO y reconciliación idempotente. Requiere una clave secreta del servidor; no es accesible al cliente móvil.
+El paquete comprueba que los APK no contienen la clave privada ni los generadores de práctica. Los datos sintéticos utilizados para probar las reglas están solo en fuentes de prueba, fuera de las aplicaciones.
 
-Las variables alojadas `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS`, `SUPABASE_SECRET_KEYS` y `SUPABASE_JWKS` las resuelve el paquete de servidor. No copies claves administrativas al móvil, al reloj ni a Git. Los ejemplos no contienen secretos.
-
-Las consultas al proveedor se realizan solo desde el backend. La cobertura depende del plan. El sistema rechaza cuotas modificadas, cerradas o caducadas, combinadas de un mismo evento y mezclas entre eventos reales y DEMO. Los resultados deportivos se liquidan con el marcador reglamentario verificado; si falta, el boleto permanece pendiente.
-
-## Reloj y conexión
-
-Inicia sesión solo en el móvil: el reloj utiliza esa misma cuenta, saldo, favoritos y boletos, sin otra contraseña ni cartera independiente. Antes del primer enlace muestra “Vincula tu móvil”. Los cambios del móvil se publican automáticamente, con mensajes inmediatos cuando hay vínculo y una copia persistente para reconexión. El reloj permite consultar cada selección del boleto, su cuota, estado, importe y retorno; las confirmaciones financieras se realizan en el móvil.
-
-Vincula los dispositivos mediante **Device Manager → Pair Wearable** (o el procedimiento del reloj físico). El teléfono del asistente requiere Android 11 o posterior y Play Store. Tener dos emuladores abiertos no significa que estén vinculados. DataClient conserva el estado y MessageClient lleva actualizaciones y acciones inmediatas. SQLite guarda la réplica y la cola del reloj durante una desconexión. Las acciones incluyen identificador, cuenta y secuencia; los cambios atrasados no pueden restaurar una cuenta anterior ni deshacer el último favorito. No se copian contraseñas ni tokens de sesión al reloj. [Requisitos oficiales de vinculación](https://developer.android.com/training/wearables/get-started/connect-phone).
-
-## Pruebas y estado
-
-```powershell
-npm ci --prefix backend-tests
-npm test --prefix backend-tests
-```
-
-Las pruebas PostgreSQL usan PGlite con Auth simulado. Las comprobaciones del servicio alojado están documentadas por separado y no se confunden con esas pruebas locales. [Auditoría inicial](docs/AUDITORIA-2.0.md), [estado y verificación](docs/ESTADO-2.0.md), [evidencia de la app](artifacts/qa/v2/).
-
-Los documentos 1.x permanecen en `docs/historial/`. Los proveedores multideporte activos están en Supabase; el reloj utiliza el estado de la cuenta del móvil.
+[Estado](docs/ESTADO-2.0.md) · [Guía para presentar](docs/GUIA-PRESENTACION.md) · [Reglas por deporte](docs/MULTIDEPORTE.md) · [Datos reales y servidor](docs/DATOS-REALES.md)

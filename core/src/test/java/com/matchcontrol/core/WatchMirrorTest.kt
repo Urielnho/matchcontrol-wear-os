@@ -7,7 +7,7 @@ import org.junit.Test
 class WatchMirrorTest {
  @Test fun pendingFavoritesAreImmediateAndScopedToTheCurrentAccount() {
   val state=DemoEngine.seed().copy(profile=Profile("account-a","Ana"))
-  val add=SyncCommand(action="team",target="900001",enabled=true,profileId="account-a")
+  val add=SyncCommand(action="team",target="900001",enabled=true,profileId="account-a",source=state.source)
   assertTrue("900001" in WatchMirror.optimistic(state,listOf(add)).favoriteTeams)
   val remove=add.copy(id=newId(),enabled=false)
   assertFalse("900001" in WatchMirror.optimistic(state,listOf(add,remove)).favoriteTeams)

@@ -15,13 +15,13 @@ class MatchViewModel(app: Application): AndroidViewModel(app) {
  val repository=AppGraph.repository(app)
  val sync=AppGraph.sync(app)
  val mirror=combine(repository.state,repository.pendingCommands) {s,commands->
-  if(repository.hasReplica()) WatchMirror.optimistic(s,commands) else Snapshot(profile=Profile(id="",displayName=""),balance=0)
- }.stateIn(viewModelScope,SharingStarted.Eagerly,Snapshot(profile=Profile(id="",displayName=""),balance=0))
+  if(repository.hasReplica()) WatchMirror.optimistic(RealData.only(s),commands) else RealData.guest()
+ }.stateIn(viewModelScope,SharingStarted.Eagerly,RealData.guest())
  private val mutable=MutableStateFlow(UiState())
  val state=mutable.asStateFlow()
  init { viewModelScope.launch {mirror.collect {render(it)}};sync.refresh() }
  private fun legacyId(value: String)=value.substringAfterLast(':').toIntOrNull() ?: (value.hashCode() and Int.MAX_VALUE)
- fun externalId(id: Int)=repository.state.value.fixtures.firstOrNull {legacyId(it.id)==id}?.id ?: id.toString()
+ fun externalId(id: Int)=mirror.value.fixtures.firstOrNull {legacyId(it.id)==id}?.id ?: id.toString()
  private fun convert(f: Fixture)=Match(legacyId(f.id),Team(legacyId(f.home.id),f.home.name,f.home.logo),Team(legacyId(f.away.id),f.away.name,f.away.logo),f.league,Instant.ofEpochMilli(f.startsAt).atZone(ZoneId.systemDefault()).toOffsetDateTime().toString(),when(f.status) {FixtureStatus.SCHEDULED->"NS";FixtureStatus.LIVE->"LIVE";FixtureStatus.FINAL->"FT";FixtureStatus.VOID->"CANC";FixtureStatus.SUSPENDED->"SUSP"},homeGoals=f.homeScore,awayGoals=f.awayScore,events=f.events,statistics=f.statistics.map {"${it.key}: ${it.value}"},leagueId=legacyId(f.leagueId))
  private fun render(s: Snapshot) {
   val teams=s.favoriteTeams;val leagues=s.favoriteLeagues
@@ -31,8 +31,8 @@ class MatchViewModel(app: Application): AndroidViewModel(app) {
  fun refresh(force: Boolean=false) {render(mirror.value);sync.refresh()}
  fun today() {mutable.update {it.copy(date=LocalDate.now())};render(mirror.value)}
  fun day(offset: Long) {mutable.update {it.copy(date=it.date.plusDays(offset),detail=null)};render(mirror.value)}
- fun select(match: Match) {mutable.update {it.copy(detail=match)}}
- fun selectFixture(fixture: Fixture) {mutable.update {it.copy(detail=convert(fixture))}}
+ fun select(match: Match) {mirror.value.fixtures.firstOrNull {legacyId(it.id)==match.id}?.let {fixture->mutable.update {it.copy(detail=convert(fixture))}}}
+ fun selectFixture(fixture: Fixture) {mirror.value.fixtures.firstOrNull {it.id==fixture.id}?.let {real->mutable.update {it.copy(detail=convert(real))}}}
  fun favorite(action: String,id: String,enabled: Boolean) {sync.command(SyncCommand(action=action,target=id,enabled=enabled))}
  fun reloadDetail() {refresh()}
  fun toggleTeam(team: Team) {val raw=(mirror.value.favoriteTeamDetails+mirror.value.fixtures.flatMap {listOf(it.home,it.away)}).firstOrNull {legacyId(it.id)==team.id}?.id ?: return;favorite("team",raw,raw !in mirror.value.favoriteTeams)}

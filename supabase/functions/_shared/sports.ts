@@ -60,7 +60,9 @@ export async function loadSport(admin:Admin,sport:Sport,body:Row) {
   if(body.id && !new RegExp("^"+prefix(sport)+"[0-9]+$").test(body.id)) throw Error("Invalid event");
   if(body.action==="odds") {
    if(!body.id) throw Error("Missing event");const res=await cached(admin,sport,"odds?game="+body.id.split(":")[1]);
-   const odds=res.stale?[]:normalizeOdds(res.data.response,sport);if(odds.length) {const saved=await admin.rpc("ingest_sport_odds",{p_rows:odds});if(saved.error) throw saved.error;}
+   const odds=res.stale?[]:normalizeOdds(res.data.response,sport);if(odds.length) {const saved=await admin.rpc("ingest_sport_odds",{p_rows:odds});if(saved.error) throw saved.error;
+    for(const id of new Set(odds.map(o=>o.matchId))) {const stamped=await admin.rpc("provider_quote_time",{p_match:id,p_asof:res.asof});if(stamped.error) throw stamped.error;}
+   }
    return {count:odds.length,stale:res.stale,oddsAvailable:odds.length>0};
   }
   if(!body.id && !/^\d{4}-\d{2}-\d{2}$/.test(body.date??"")) throw Error("Invalid date");

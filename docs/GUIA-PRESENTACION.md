@@ -1,11 +1,11 @@
-# Presentar MatchControl 2.0
+﻿# Presentar MatchControl 2.1
 
-1. Ejecuta mobile en el teléfono y wear en el reloj circular. Explica que son dos aplicaciones del mismo proyecto.
-2. Sin sesión, muestra DEMO, el saldo educativo y los cuatro selectores deportivos. Con sesión también puedes activar Perfil → Resultados → Demostración.
-3. Sigue el recorrido de [Multideporte](MULTIDEPORTE.md): un mercado de fútbol, baloncesto, béisbol y F1 en un solo parlay. Resuelve los eventos desde el laboratorio y comprueba que espera todos los resultados y paga una sola vez.
-4. En Resultados → Reales, muestra encuentros y marcadores de los proveedores. Si faltan cuotas, muestra el estado vacío. F1 real entrega calendario y clasificación; sus mercados se prueban con eventos DEMO, sin presentar precios ficticios como reales.
-5. Explica que Supabase controla la contabilidad y API-Football entrega los datos deportivos. Las credenciales privadas permanecen en el servidor.
-6. Presenta las pruebas y capturas de `ESTADO-2.0.md`. Distingue las pruebas instrumentadas de la comprobación pendiente de dispositivos vinculados.
-7. La vinculación de este equipo ya transmitió cuenta, saldo, favoritos y un parlay mixto al reloj. Muestra Créditos y boletos → Ver selecciones. Quita un favorito desde el reloj y comprueba que cambia en el móvil. Para otra instalación, usa Device Manager → Pair Wearable.
+1. Abre el teléfono y el reloj con ejecutar-matchcontrol.ps1 -SinCompilar.
+2. En Partidos, elige un deporte y una fecha. Comprueba el nombre del evento, la liga, la hora local y el estado. En Inicio aparecen los últimos resultados publicados.
+3. Abre un evento para ver sus detalles. Si el proveedor ofrece cuotas compatibles, se muestran; si no, aparece un mensaje de disponibilidad. En F1 presenta calendario y clasificación, sin cuotas inventadas.
+4. Guarda un equipo o encuentro como favorito y comprueba el cambio en el reloj. Los resultados públicos se pueden consultar sin iniciar sesión.
+5. Inicia sesión con tu propia cuenta para acceder a créditos y boletos. El reloj usa la misma cuenta. El saldo representa créditos virtuales, sin dinero real.
+6. Elige una cuota publicada de un evento próximo. Usa Agregar otro partido para formar un parlay. Cada selección debe pertenecer a un evento diferente y conservar su cuota vigente.
+7. La confirmación descuenta créditos una sola vez y el boleto aparece en el reloj. La liquidación espera los resultados reales verificados; no existe un laboratorio ni controles para editar marcadores.
 
-Todos los boletos usan créditos virtuales. No hay depósitos ni premios canjeables.
+No prometas cuotas para un evento sin cobertura. Explica la diferencia entre un resultado deportivo real y los créditos virtuales que utiliza el proyecto.

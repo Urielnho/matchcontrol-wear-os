@@ -10,7 +10,7 @@ android {
  namespace = "com.matchcontrol.mobile"
  compileSdk = 36
  defaultConfig {
-  applicationId="com.matchcontrol";minSdk=30;targetSdk=36;versionCode=20;versionName="2.0.0"
+  applicationId="com.matchcontrol";minSdk=30;targetSdk=36;versionCode=21;versionName="2.1.0"
   buildConfigField("String","SUPABASE_URL","\"${clientConfig("SUPABASE_URL")}\"")
   buildConfigField("String","SUPABASE_PUBLISHABLE_KEY","\"${clientConfig("SUPABASE_PUBLISHABLE_KEY")}\"")
  }

@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib, json, shutil, zipfile, xml.etree.ElementTree as ET
 
 root = Path(__file__).resolve().parent
-out = root / "entrega/v2"
+out = root / "entrega/MatchControl-2.1"
 out.mkdir(parents=True, exist_ok=True)
 keys = []
 local = root / "local.properties"
@@ -16,31 +16,37 @@ def check(data, name):
     if any(key in data for key in keys):
         raise RuntimeError("Private provider credential found: " + name)
 
-apks = {"MatchControl-Mobile-2.0.apk": root/"mobile/build/outputs/apk/debug/mobile-debug.apk",
-        "MatchControl-Wear-2.0.apk": root/"app/build/outputs/apk/debug/wear-debug.apk"}
+apks = {"MatchControl-Mobile-2.1.apk": root/"mobile/build/outputs/apk/debug/mobile-debug.apk",
+        "MatchControl-Wear-2.1.apk": root/"app/build/outputs/apk/debug/wear-debug.apk"}
+forbidden=[b"Lcom/matchcontrol/core/DemoEngine;",b"Lcom/matchcontrol/core/DemoLab;",b"Lcom/matchcontrol/core/MultiSportDemo;",b"Laboratorio DEMO",b"Confirmar boleto DEMO"]
 for name, apk in apks.items():
     with zipfile.ZipFile(apk) as archive:
         for entry in archive.namelist():
-            check(archive.read(entry), entry)
+            data=archive.read(entry)
+            check(data, entry)
+            if any(marker in data for marker in forbidden):
+                raise RuntimeError("Retired practice feature found in application: "+entry)
     shutil.copy2(apk, out/name)
 
 members = set()
-for directory in ["app/src", "mobile/src", "core/src", "gradle", "docs", ".run", "supabase/functions", "supabase/migrations"]:
+for directory in ["app/src", "mobile/src", "core/src", "gradle", ".run", "supabase/functions", "supabase/migrations"]:
     members.update(p for p in (root/directory).rglob("*") if p.is_file() and "__pycache__" not in p.parts)
 for directory in ["backend-tests"]:
-    members.update(p for p in (root/directory).iterdir() if p.is_file() and p.suffix in {".json", ".mjs", ".js", ".py"})
-for name in [".gitignore", "build.gradle.kts", "settings.gradle.kts", "gradle.properties", "gradlew", "gradlew.bat", "app/build.gradle.kts", "mobile/build.gradle.kts", "core/build.gradle.kts", "README.md", "VALIDACION.md", "REDISENO.md", "local.properties.example", "supabase/config.toml", "supabase/.env.example", "ejecutar-circular.ps1", "ejecutar-matchcontrol.ps1", "preparar-entrega.py"]:
+    members.update(p for p in (root/directory).iterdir() if p.is_file() and p.suffix in {".json", ".mjs", ".js", ".ts", ".py"})
+for name in [".gitignore", "build.gradle.kts", "settings.gradle.kts", "gradle.properties", "gradlew", "gradlew.bat", "app/build.gradle.kts", "mobile/build.gradle.kts", "core/build.gradle.kts", "README.md", "local.properties.example", "supabase/config.toml", "supabase/.env.example", "ejecutar-circular.ps1", "ejecutar-matchcontrol.ps1", "preparar-entrega.py"]:
     members.add(root/name)
-with zipfile.ZipFile(out/"Codigo-MatchControl-2.0.zip", "w", zipfile.ZIP_DEFLATED) as archive:
+for name in ["ESTADO-2.0.md","GUIA-PRESENTACION.md","MULTIDEPORTE.md","VINCULAR-DISPOSITIVOS.md","DATOS-REALES.md"]:
+    members.add(root/"docs"/name)
+with zipfile.ZipFile(out/"Codigo-MatchControl-2.1.zip", "w", zipfile.ZIP_DEFLATED) as archive:
     for path in sorted(members):
         data=path.read_bytes(); check(data, str(path.relative_to(root)))
         archive.writestr(path.relative_to(root).as_posix(), data)
 for name in ["README.md", "docs/ESTADO-2.0.md", "docs/GUIA-PRESENTACION.md"]:
     shutil.copy2(root/name, out/Path(name).name)
 captures=out/"capturas"; captures.mkdir(exist_ok=True)
-for path in (root/"artifacts/qa/v2").glob("premium-*.png"):
+for path in list((root/"artifacts/qa/v2").glob("real-only-*.png"))+list((root/"artifacts/qa/v2").glob("premium-real-only-*.png")):
     shutil.copy2(path, captures/path.name)
-report={"development_apks": True, "private_provider_key_absent": True}
+report={"development_apks": True, "private_provider_key_absent": True, "real_provider_events_only": True, "practice_generators_absent_from_apks": True}
 for module in ["core", "app"]:
     suites=[ET.parse(p).getroot() for p in (root/module/"build/test-results/testDebugUnitTest").glob("TEST-*.xml")]
     report[module]={key:sum(int(s.get(key,0)) for s in suites) for key in ["tests","failures","errors","skipped"]}

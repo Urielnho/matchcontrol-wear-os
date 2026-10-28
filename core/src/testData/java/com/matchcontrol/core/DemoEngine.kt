@@ -16,7 +16,7 @@ object DemoEngine {
    values.map { (key,label,odds)->Outcome("${f.id}:${type.name}:$key",f.id,type,key,label,odds,now,f.status==FixtureStatus.SCHEDULED) }
   } }
   val extra=MultiSportDemo.seed(now)
-  return Snapshot(fixtures=fixtures+extra.first,outcomes=markets+extra.second,transactions=listOf(WalletTransaction(newId(),"INITIAL",1_000_000,"demo-profile",now)),updatedAt=now)
+  return Snapshot(profile=Profile("local-demo","Estudiante"),balance=1_000_000,fixtures=fixtures+extra.first,outcomes=markets+extra.second,transactions=listOf(WalletTransaction(newId(),"INITIAL",1_000_000,"demo-profile",now)),updatedAt=now)
  }
  fun place(s: Snapshot,r: BetRequest,now: Long=System.currentTimeMillis()): Pair<Snapshot,Bet> {
   require(r.requestId.isNotBlank())

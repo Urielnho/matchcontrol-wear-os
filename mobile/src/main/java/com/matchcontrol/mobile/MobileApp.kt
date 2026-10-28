@@ -49,7 +49,11 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun MobileApp(vm: MobileViewModel) {
  var chosenSport by rememberSaveable {mutableStateOf<SportKind?>(null)}
- val state by vm.state.collectAsStateWithLifecycle();val slip by vm.slip.collectAsStateWithLifecycle();val sync by vm.sync.state.collectAsStateWithLifecycle()
+ val received by vm.state.collectAsStateWithLifecycle();val slip by vm.slip.collectAsStateWithLifecycle();val sync by vm.sync.state.collectAsStateWithLifecycle()
+ // Legacy caches cannot reintroduce generated events or tickets into the release UI.
+ val realFixtures=received.fixtures.filter {it.source=="API_FOOTBALL"}
+ val realIds=realFixtures.map {it.id}.toSet()
+ val state=received.copy(fixtures=realFixtures,outcomes=received.outcomes.filter {it.matchId in realIds},bets=received.bets.filter {it.source=="API_FOOTBALL"})
  val signed by vm.signedIn.collectAsStateWithLifecycle();val loading by vm.loading.collectAsStateWithLifecycle()
  val online by vm.online.collectAsStateWithLifecycle()
  val now by produceState(System.currentTimeMillis()) {while(true) {delay(30_000);value=System.currentTimeMillis()}}
@@ -57,7 +61,7 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
  val snack=remember { SnackbarHostState() };val message by vm.message.collectAsStateWithLifecycle()
  LaunchedEffect(message) { message?.let { snack.showSnackbar(it);vm.message.value=null } }
  val lifecycle=LocalLifecycleOwner.current
- LaunchedEffect(lifecycle) {lifecycle.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {var tick=0;while(true) {vm.sync.refresh();delay(15_000);if(++tick%4==0 && vm.signedIn.value && vm.online.value) vm.poll();if(tick%60==0 && vm.signedIn.value && vm.online.value) vm.refresh()}} }
+ LaunchedEffect(lifecycle) {lifecycle.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {var tick=0;while(true) {vm.sync.refresh();delay(15_000);if(++tick%4==0 && vm.online.value) vm.poll();if(tick%60==0 && vm.online.value) vm.refresh()}} }
  LaunchedEffect(state.selectedMatch) { state.selectedMatch?.let { id->nav.navigate("match/$id");vm.act { vm.account.consumeSelection() } } }
  val wide=LocalConfiguration.current.screenWidthDp>=700
  MaterialTheme(colorScheme=darkColorScheme(primary=Lime,onPrimary=Color.Black,primaryContainer=Raised,onPrimaryContainer=Lime,background=Background,surface=Surface,surfaceVariant=Raised,onSurface=Color(0xFFF7F9FA),onSurfaceVariant=Muted,secondary=Lime,secondaryContainer=Raised,onSecondaryContainer=Lime,outline=Color(0xFF343D44))) {
@@ -66,16 +70,16 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
      Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
       if(route=="home") Icon(Icons.Outlined.SportsSoccer,null,tint=Lime,modifier=Modifier.size(22.dp))
-      Text(if(route.startsWith("match/")) "Evento" else when(route) { "home"->"MatchControl";"matches"->"Partidos";"slip"->"Boleto";"bets"->"Mis apuestas";"wallet"->"Saldo demo";"favorites"->"Favoritos";"settings"->"Perfil";"lab"->"Laboratorio";else->"MatchControl" },fontSize=22.sp,fontWeight=FontWeight.Bold)
+      Text(if(route.startsWith("match/")) "Evento" else when(route) { "home"->"MatchControl";"matches"->"Partidos";"slip"->"Boleto";"bets"->"Mis apuestas";"wallet"->"Créditos";"favorites"->"Favoritos";"settings"->"Perfil";else->"MatchControl" },fontSize=22.sp,fontWeight=FontWeight.Bold)
      }
      Row(verticalAlignment=Alignment.CenterVertically) {
-      if(state.source=="DEMO") Surface(color=Raised,shape=RoundedCornerShape(8.dp)) {Text("DEMO",Modifier.padding(horizontal=8.dp,vertical=5.dp),color=Lime,fontSize=10.sp,fontWeight=FontWeight.Bold)}
       IconButton(onClick={nav.navigate("slip")}) {BadgedBox(badge={if(slip.isNotEmpty()) Badge {Text("${slip.size}")}}) {Icon(Icons.Outlined.ConfirmationNumber,"Abrir boleto")}}
      }
     }
-    if(route in listOf("slip","bets","wallet")) Text("Créditos ficticios · sin dinero real",color=Muted,fontSize=11.sp,modifier=Modifier.padding(top=5.dp))
+    if(route in listOf("slip","bets","wallet")) Text("Créditos virtuales · sin dinero real",color=Muted,fontSize=11.sp,modifier=Modifier.padding(top=5.dp))
     if(loading) LinearProgressIndicator(modifier=Modifier.fillMaxWidth().padding(top=8.dp),color=Lime,trackColor=Raised)
-    if(!online && signed) Row(Modifier.padding(top=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {Icon(Icons.Outlined.WifiOff,null,modifier=Modifier.size(14.dp),tint=Muted);Text("Sin conexión · datos guardados",color=Muted,fontSize=11.sp)}
+    if(!online) Row(Modifier.padding(top=8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)) {Icon(Icons.Outlined.WifiOff,null,modifier=Modifier.size(14.dp),tint=Muted);Text("Sin conexión · datos guardados",color=Muted,fontSize=11.sp)}
+    else if(state.stale) Text("Resultados guardados · actualización pendiente",color=Muted,fontSize=11.sp,modifier=Modifier.padding(top=8.dp))
    }
   },bottomBar={ if(!wide) NavigationBar(containerColor=Surface) { destinations.forEach { d-> NavigationBarItem(selected=route==d.route,onClick={nav.navigate(d.route) { popUpTo("home");launchSingleTop=true }},icon={BadgedBox(badge={if(d.route=="slip" && slip.isNotEmpty()) Badge {Text("${slip.size}")} }) {Icon(d.icon,d.name)}},label={Text(d.name,fontSize=11.sp)}) } } }) { padding->
    Row(Modifier.fillMaxSize().padding(padding)) {
@@ -84,10 +88,11 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
      NavHost(nav,startDestination="home",modifier=Modifier.widthIn(max=800.dp).fillMaxSize()) {
       composable("home") {
        val upcoming=state.fixtures.filter {it.status==FixtureStatus.SCHEDULED && it.startsAt>now && (chosenSport==null || it.sport==chosenSport)}.sortedBy {it.startsAt}.take(6)
+       val latestResults=state.fixtures.filter {it.status==FixtureStatus.FINAL && (chosenSport==null || it.sport==chosenSport)}.sortedByDescending {it.startsAt}.take(3)
        LazyColumn(contentPadding=PaddingValues(22.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {SportPicker(chosenSport) {chosenSport=it;vm.date(LocalDate.now(),it ?: SportKind.FOOTBALL)}}
-        item { Card(onClick={nav.navigate("wallet")},shape=shape,colors=CardDefaults.cardColors(containerColor=Surface)) {
-         Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {Column {Text("Saldo demo",color=Muted,fontSize=12.sp);Text(credits(state.balance),color=Color.White,fontSize=26.sp,fontWeight=FontWeight.Bold)};Text("créditos  ›",color=Lime,fontSize=12.sp) }
+        item { Card(onClick={nav.navigate(if(signed) "wallet" else "settings")},shape=shape,colors=CardDefaults.cardColors(containerColor=Surface)) {
+         Row(Modifier.fillMaxWidth().padding(18.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {Column {Text("Créditos",color=Muted,fontSize=12.sp);Text(if(signed) credits(state.balance) else "Inicia sesión",color=Color.White,fontSize=26.sp,fontWeight=FontWeight.Bold)};Text(if(signed) "créditos  ›" else "›",color=Lime,fontSize=12.sp) }
         } }
         item { Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) { OutlinedButton(onClick={nav.navigate("bets")},modifier=Modifier.weight(1f)) {Text("${state.bets.count { it.status==BetStatus.PENDING }} pendientes")};OutlinedButton(onClick={nav.navigate("favorites")},modifier=Modifier.weight(1f)) {Text("Favoritos") } } }
         if(state.fixtures.any {it.status==FixtureStatus.LIVE && (chosenSport==null || it.sport==chosenSport)}) item { Heading("En vivo") }
@@ -95,9 +100,10 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
         item { Heading("Próximos encuentros") }
         items(upcoming) { FixtureCard(it) {nav.navigate("match/${it.id}")} }
         if(upcoming.isEmpty() && !loading) item {
-         Empty("Sin próximos eventos",if(state.source=="DEMO") "Crea una jornada para seguir practicando. Tu saldo y boletos se conservan." else "Consulta otra fecha en Partidos o actualiza los resultados.")
-         if(state.source=="DEMO") Button(onClick={vm.newRound()},enabled=!loading) {Text("Crear jornada DEMO")}
+         Empty("Sin próximos eventos","Consulta otra fecha en Partidos o actualiza los resultados.")
         }
+        if(latestResults.isNotEmpty()) item {Heading("Últimos resultados")}
+        items(latestResults) {FixtureCard(it) {nav.navigate("match/${it.id}")}}
         item {TextButton(onClick={vm.refresh()}) {Icon(Icons.Outlined.Refresh,null,modifier=Modifier.size(16.dp));Text("Actualizar",Modifier.padding(start=6.dp))}}
         if(state.dataUpdatedAt>0) item {Text("Actualizado ${time(state.dataUpdatedAt)}",color=Muted,fontSize=11.sp)}
        }
@@ -105,13 +111,13 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
       composable("matches") {
        var day by rememberSaveable { mutableIntStateOf(0) };var kind by rememberSaveable {mutableStateOf("Todos")};var league by rememberSaveable { mutableStateOf<String?>(null) }
        val date=LocalDate.now().plusDays(day.toLong())
-       LaunchedEffect(date,signed,chosenSport,state.source) {league=null;vm.date(date,chosenSport ?: SportKind.FOOTBALL)}
+       LaunchedEffect(date,signed,chosenSport) {league=null;vm.date(date,chosenSport ?: SportKind.FOOTBALL)}
        val fixtures=state.fixtures.filter { (chosenSport==null || it.sport==chosenSport) && (chosenSport==SportKind.FORMULA1 || Instant.ofEpochMilli(it.startsAt).atZone(ZoneId.systemDefault()).toLocalDate()==date) && (league==null || it.leagueId==league) && when(kind) { "En vivo"->it.status==FixtureStatus.LIVE;"Próximos"->it.status==FixtureStatus.SCHEDULED && it.startsAt>now;"Finales"->it.status==FixtureStatus.FINAL;else->true } }
        LazyColumn(contentPadding=PaddingValues(22.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         item {SportPicker(chosenSport) {chosenSport=it}}
         item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) { IconButton(onClick={day--}) {Icon(Icons.Outlined.ChevronLeft,"Día anterior")};Text(date.format(DateTimeFormatter.ofPattern("dd MMM yyyy")));IconButton(onClick={day++}) {Icon(Icons.Outlined.ChevronRight,"Día siguiente")} } }
         item { Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(5.dp)) {listOf("Todos","En vivo","Próximos","Finales").forEach { label->FilterChip(selected=kind==label,onClick={kind=label},label={Text(label,fontSize=11.sp)}) } } }
-        item { Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {FilterChip(selected=league==null,onClick={league=null},label={Text("Todas")});state.fixtures.distinctBy { it.leagueId }.forEach { f->FilterChip(selected=league==f.leagueId,onClick={league=f.leagueId},label={Text(f.league,fontSize=11.sp)}) }} }
+        item { Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {FilterChip(selected=league==null,onClick={league=null},label={Text("Todas")});state.fixtures.filter {chosenSport==null || it.sport==chosenSport}.distinctBy { it.leagueId }.forEach { f->FilterChip(selected=league==f.leagueId,onClick={league=f.leagueId},label={Text(f.league,fontSize=11.sp)}) }} }
         if(fixtures.isEmpty()) item { Empty("No hay encuentros","Cambia la fecha o los filtros.") }
         items(fixtures) { FixtureCard(it) {nav.navigate("match/${it.id}")} }
        }
@@ -131,9 +137,9 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
         if(fixture.raceResults.isNotEmpty()) item {Heading("Clasificación");fixture.raceResults.forEach {r->Text((r.position?.toString() ?: "NC")+" · "+(fixture.participants.firstOrNull {it.id==r.driverId}?.name ?: r.driverId),Modifier.padding(vertical=5.dp),color=Muted)}}
         if(fixture.events.isNotEmpty()) item { Heading("Lo que pasó");fixture.events.forEach {Text(it,Modifier.padding(vertical=6.dp),color=Muted)} }
         if(fixture.statistics.isNotEmpty()) item { Heading("Estadísticas");Statistics(fixture.statistics) }
-        item {Heading("Mercados",if(fixture.source=="DEMO") "Cuotas ficticias" else "Solo créditos virtuales")}
-        if(signed) item {OutlinedButton(onClick={vm.markets(fixture.id)}) {Text("Consultar cuotas")}}
-        if(state.outcomes.none {it.matchId==fixture.id}) item {Empty("Sin cuotas disponibles","No se pueden crear selecciones para este partido.")}
+        item {Heading("Mercados","Créditos virtuales")}
+        item {OutlinedButton(onClick={vm.markets(fixture.id)}) {Text("Consultar cuotas")}}
+        if(state.outcomes.none {it.matchId==fixture.id}) item {Empty("Sin cuotas disponibles","El proveedor no ofrece cuotas para este evento. No es posible agregarlo al boleto.")}
         if(fixture.status!=FixtureStatus.SCHEDULED || fixture.startsAt<=now) item {Empty("Mercados cerrados","No se aceptan selecciones una vez iniciado el evento.")} else {
          MarketType.entries.filter {type->state.outcomes.any {it.matchId==fixture.id && it.market==type}}.forEach { type->item {
           Text(marketName(type),fontWeight=FontWeight.SemiBold,modifier=Modifier.padding(bottom=10.dp))
@@ -151,7 +157,7 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
       composable("slip") {
        var stake by rememberSaveable {mutableStateOf("100")};var confirm by remember {mutableStateOf(false)}
        val available=slip.all {o->state.fixtures.any {it.id==o.matchId && it.status==FixtureStatus.SCHEDULED && it.startsAt>now} && state.outcomes.any {it.id==o.id && it.open && it.odds==o.odds}}
-       LaunchedEffect(available,state.profile.id,state.source) {confirm=false}
+       LaunchedEffect(available,state.profile.id,signed) {confirm=false}
        val potential=runCatching {BettingRules.returns(parseCredits(stake),slip.map { it.odds })}.getOrNull()
        LazyColumn(contentPadding=PaddingValues(22.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {Heading(if(slip.size>1) "Parlay · ${slip.size} partidos" else "Apuesta simple","Una selección por partido · hasta 10 partidos")}
@@ -163,30 +169,30 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
          item {OutlinedTextField(value=stake,onValueChange={stake=it},label={Text("Créditos virtuales")},supportingText={Text("Disponibles: ${credits(state.balance)} · mínimo 1")},singleLine=true,modifier=Modifier.fillMaxWidth())}
          item {Card(shape=shape,colors=CardDefaults.cardColors(containerColor=Surface)) {Column(Modifier.fillMaxWidth().padding(22.dp)) {Text("RETORNO POTENCIAL",color=Muted,fontSize=12.sp);Text(potential?.let(::credits) ?: "Importe inválido",fontSize=32.sp,color=Lime,fontWeight=FontWeight.Bold);Text("Incluye los créditos apostados",fontSize=12.sp,color=Muted)}}}
          if(!available) item {Empty("Revisa tus selecciones","Un evento ya comenzó, se cerró el mercado o cambió su cuota. Quita esa selección y consulta los mercados de nuevo.")}
-         item {Button(onClick={confirm=true},enabled=!loading && available && potential!=null && runCatching {parseCredits(stake) in 100..state.balance}.getOrDefault(false),modifier=Modifier.fillMaxWidth().height(54.dp)) {Text("Confirmar boleto DEMO")}}
+         if(!signed) item {Text("Inicia sesión para confirmar tu boleto",color=Muted);TextButton(onClick={nav.navigate("settings")}) {Text("Iniciar sesión")}}
+         item {Button(onClick={confirm=true},enabled=signed && !loading && available && potential!=null && runCatching {parseCredits(stake) in 100..state.balance}.getOrDefault(false),modifier=Modifier.fillMaxWidth().height(54.dp)) {Text("Confirmar boleto")}}
         }
        }
-       if(confirm) AlertDialog(onDismissRequest={confirm=false},title={Text("Confirmar simulación")},text={Text("Se descontarán $stake créditos virtuales. Las cuotas quedarán bloqueadas. No hay dinero real.")},confirmButton={TextButton(onClick={confirm=false;vm.confirm(stake) {nav.navigate("bets")}}) {Text("Confirmar")}},dismissButton={TextButton(onClick={confirm=false}) {Text("Cancelar")}})
+       if(confirm && signed) AlertDialog(onDismissRequest={confirm=false},title={Text("Confirmar apuesta")},text={Text("Se descontarán $stake créditos virtuales. Las cuotas quedarán bloqueadas. No hay dinero real.")},confirmButton={TextButton(onClick={confirm=false;vm.confirm(stake) {nav.navigate("bets")}}) {Text("Confirmar")}},dismissButton={TextButton(onClick={confirm=false}) {Text("Cancelar")}})
       }
       composable("bets") {
        var active by rememberSaveable {mutableStateOf(true)}
        LazyColumn(contentPadding=PaddingValues(22.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         item {Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {FilterChip(selected=active,onClick={active=true},label={Text("Activas")});FilterChip(selected=!active,onClick={active=false},label={Text("Finalizadas")})}}
         val bets=state.bets.asReversed().filter { (it.status==BetStatus.PENDING)==active }
-        if(bets.isEmpty()) item {Empty("Sin boletos","Tus apuestas simuladas aparecerán aquí.")}
+        if(bets.isEmpty()) item {Empty("Sin boletos",if(signed) "Tus boletos aparecerán aquí." else "Inicia sesión para consultar tus boletos.")}
+        if(!signed) item {TextButton(onClick={nav.navigate("settings")}) {Text("Iniciar sesión")}}
         items(bets,key={it.id}) {bet->BetCard(bet)}
        }
       }
       composable("wallet") {
-       var reset by remember {mutableStateOf(false)}
        LazyColumn(contentPadding=PaddingValues(22.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-        item {Heading("${credits(state.balance)} créditos")}
-        item {Text("Utilizados: ${credits(state.bets.sumOf { it.stake })}",color=Muted);Text("Retornos: ${credits(state.bets.sumOf { it.returned })}",color=Lime);Text("Resultado neto: ${credits(state.bets.filter { it.status==BetStatus.WON || it.status==BetStatus.LOST }.sumOf { it.returned-it.stake })}",color=Muted)}
-        item {OutlinedButton(onClick={reset=true}) {Text("Restablecer saldo DEMO")}}
-        item {Heading("Movimientos")}
-        items(state.transactions.asReversed(),key={it.id}) {t->Row(Modifier.fillMaxWidth().padding(vertical=8.dp),horizontalArrangement=Arrangement.SpaceBetween) {Column {Text(when(t.kind) {"INITIAL"->"Créditos iniciales";"STAKE"->"Boleto confirmado";"RESET"->"Reinicio confirmado";"REFUND"->"Devolución";else->"Liquidación"});Text(time(t.createdAt),fontSize=12.sp,color=Muted)};Text((if(t.amount>0) "+" else "")+credits(t.amount),color=if(t.amount>0) Lime else Color.White)}}
+        if(!signed) item {Empty("Inicia sesión","Accede a tu cuenta para consultar tus créditos y movimientos.");TextButton(onClick={nav.navigate("settings")}) {Text("Iniciar sesión")}}
+        if(signed) item {Heading("${credits(state.balance)} créditos")}
+        if(signed) item {Text("Utilizados: ${credits(state.bets.sumOf { it.stake })}",color=Muted);Text("Retornos: ${credits(state.bets.sumOf { it.returned })}",color=Lime);Text("Resultado neto: ${credits(state.bets.filter { it.status==BetStatus.WON || it.status==BetStatus.LOST }.sumOf { it.returned-it.stake })}",color=Muted)}
+        if(signed) item {Heading("Movimientos")}
+        items(if(signed) state.transactions.asReversed() else emptyList(),key={it.id}) {t->Row(Modifier.fillMaxWidth().padding(vertical=8.dp),horizontalArrangement=Arrangement.SpaceBetween) {Column {Text(when(t.kind) {"INITIAL"->"Créditos iniciales";"STAKE"->"Boleto confirmado";"RESET"->"Reinicio confirmado";"REFUND"->"Devolución";else->"Liquidación"});Text(time(t.createdAt),fontSize=12.sp,color=Muted)};Text((if(t.amount>0) "+" else "")+credits(t.amount),color=if(t.amount>0) Lime else Color.White)}}
        }
-       if(reset) AlertDialog(onDismissRequest={reset=false},title={Text("¿Restablecer a 10,000?")},text={Text("Se registra el ajuste y se conserva el historial. No debe haber boletos pendientes.")},confirmButton={TextButton(onClick={reset=false;vm.reset()}) {Text("Restablecer")}},dismissButton={TextButton(onClick={reset=false}) {Text("Cancelar")}})
       }
       composable("favorites") {
        var choosing by rememberSaveable {mutableStateOf(false)}
@@ -211,15 +217,12 @@ private val destinations=listOf(Destination("home","Inicio",Icons.Outlined.Home)
        val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {granted->vm.notifications(granted)}
        LazyColumn(contentPadding=PaddingValues(22.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
         item {AuthPanel(vm,signed,state.profile.displayName,loading)}
-        if(signed) item {Heading("Resultados");Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {FilterChip(selected=state.source!="DEMO",onClick={vm.mode(false)},label={Text("Reales")});FilterChip(selected=state.source=="DEMO",onClick={vm.mode(true)},label={Text("Demostración")})};Text("La demostración usa eventos y cuotas ficticios de los cuatro deportes.",color=Muted,fontSize=12.sp)}
-        item {Card(onClick={nav.navigate("wallet")},shape=shape,colors=CardDefaults.cardColors(containerColor=Surface)) {Row(Modifier.fillMaxWidth().padding(20.dp),horizontalArrangement=Arrangement.SpaceBetween) {Text("Billetera demo");Text("${credits(state.balance)}  ›",color=Lime)}}}
+        if(signed) item {Card(onClick={nav.navigate("wallet")},shape=shape,colors=CardDefaults.cardColors(containerColor=Surface)) {Row(Modifier.fillMaxWidth().padding(20.dp),horizontalArrangement=Arrangement.SpaceBetween) {Text("Créditos virtuales");Text("${credits(state.balance)}  ›",color=Lime)}}}
         item {ListItem(headlineContent={Text("Notificaciones")},trailingContent={Switch(checked=state.notifications,onCheckedChange={on->if(on && android.os.Build.VERSION.SDK_INT>=33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) permission.launch(Manifest.permission.POST_NOTIFICATIONS) else vm.notifications(on)})},colors=ListItemDefaults.colors(containerColor=Surface))}
         item {Heading("Smartwatch");Text("El reloj usa esta misma cuenta, favoritos y boletos.",color=Muted,fontSize=12.sp);Text(if(sync.connected) "Conectado" else "Desconectado",color=if(sync.connected) Lime else Muted);Text(if(sync.lastSync>0) "Actualizado ${time(sync.lastSync)}" else "Sin sincronización confirmada",color=Muted,fontSize=12.sp);if(sync.pending>0) Text("${sync.pending} cambios pendientes",color=Muted);TextButton(onClick={vm.sync.refresh()}) {Text("Sincronizar")}}
-        if(state.source=="DEMO") item {Text("Partidos y cuotas ficticios. Los créditos no tienen valor monetario.",color=Muted,fontSize=12.sp);TextButton(onClick={nav.navigate("lab")}) {Text("Laboratorio DEMO")}}
-        item {Text("MatchControl 2.0",color=Muted,fontSize=12.sp)}
+        item {Text("MatchControl 2.1",color=Muted,fontSize=12.sp)}
        }
       }
-      composable("lab") {MultiSportLab(state,vm)}
      }
     }
    }

@@ -84,7 +84,6 @@ import kotlinx.coroutines.delay
          }
         }
        }
-       if(vm.repository.hasReplica() && sandbox.source=="DEMO") item(key="demo") { Text("DEMO · datos ficticios",style=MatchType.Micro,color=MatchColors.Accent) }
        if(!s.settingsReady || routeLoading || (route=="details" && s.detailLoading)) item(key="loading") {
         Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
          CircularProgressIndicator(modifier=Modifier.size(22.dp),strokeWidth=2.dp)
@@ -92,6 +91,7 @@ import kotlinx.coroutines.delay
         }
        }
        if(!s.online && s.settingsReady) item(key="offline") { StatusNotice(Glyph.Offline,"Sin internet","Puedes consultar los datos guardados.") }
+       else if(sandbox.stale) item(key="cached") {Text("Resultados guardados",style=MatchType.Micro,color=MatchColors.Secondary)}
        (if(route in listOf("sportfeed","sportdetail")) extra.error else if(route=="sports") null else s.error)?.let { message -> item(key="error") { StatusNotice(Glyph.Error,"No se pudo completar",message,MatchColors.Warning) } }
        if(if(route in listOf("sportfeed","sportdetail")) extra.stale else route!="sports" && s.stale) item(key="stale") { StatusNotice(Glyph.Refresh,"Pendiente de actualizar","Mostrando la última información guardada.") }
        val currentError=if(route in listOf("sportfeed","sportdetail")) extra.error else s.error
@@ -102,8 +102,8 @@ import kotlinx.coroutines.delay
        }
        when(route) {
         "home"->{
-         if(vm.repository.hasReplica()) premiumHome(s,matches,{nav.navigate(it)},{vm.select(it);nav.navigate("details")})
-         else {item {StatePanel(Glyph.Refresh,"Una sola cuenta","Vincula el móvil. Sus favoritos y boletos aparecerán aquí.")};item {SportAction("Conectar móvil",Glyph.Refresh) {vm.sync.refresh()}}}
+         if(vm.repository.hasReplica() && sandbox.fixtures.isNotEmpty()) premiumHome(s,matches,{nav.navigate(it)},{vm.select(it);nav.navigate("details")})
+         else {item {StatePanel(Glyph.Refresh,if(vm.repository.hasReplica()) "Sin resultados disponibles" else "Una sola cuenta",if(vm.repository.hasReplica()) "Abre el móvil para cargar resultados." else "Vincula el móvil. Sus favoritos y boletos aparecerán aquí.")};item {SportAction("Actualizar desde el móvil",Glyph.Refresh) {vm.sync.refresh()}}}
          item {SportAction("Créditos y boletos",Glyph.Star) {nav.navigate("sandbox")}}
         }
         "live","upcoming","results"->sportListing(route,s,matches,vm::day) { vm.select(it);nav.navigate("details") }

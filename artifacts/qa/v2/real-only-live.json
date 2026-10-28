@@ -1,0 +1,73 @@
+{
+  "date_utc": "2026-10-28",
+  "guest": true,
+  "sports": {
+    "FOOTBALL": {
+      "events": 500,
+      "outcomes": 0,
+      "stale": false,
+      "dataUpdatedAt": 1793225234423
+    },
+    "BASKETBALL": {
+      "events": 138,
+      "outcomes": 0,
+      "stale": false,
+      "dataUpdatedAt": 1793225236759
+    },
+    "BASEBALL": {
+      "events": 14,
+      "outcomes": 0,
+      "stale": false,
+      "dataUpdatedAt": 1793225238349
+    },
+    "FORMULA1": {
+      "events": 23,
+      "outcomes": 0,
+      "stale": false,
+      "dataUpdatedAt": 1793225239658
+    }
+  },
+  "checks": [
+    {
+      "action": "odds",
+      "status": 400
+    },
+    {
+      "action": "odds",
+      "status": 404
+    },
+    {
+      "action": "place",
+      "status": 400
+    },
+    {
+      "action": "demoRound",
+      "status": 400
+    },
+    {
+      "action": "events",
+      "status": 400
+    }
+  ],
+  "quote_samples": {
+    "FOOTBALL": {
+      "event": "api:1492438",
+      "league": "Serie A",
+      "outcomes": 8,
+      "stale": false
+    },
+    "BASKETBALL": {
+      "event": "basket:518779",
+      "league": "NBB",
+      "outcomes": 2,
+      "stale": false
+    },
+    "BASEBALL": {
+      "event": "base:187643",
+      "league": "LVBP",
+      "outcomes": 2,
+      "stale": false
+    }
+  },
+  "f1_future_calendar_detail_without_odds": true
+}

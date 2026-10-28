@@ -28,14 +28,12 @@ Deno.serve(withSupabase({auth:"secret"},async(req: Request,ctx)=>{
     const ingest=await client.rpc("ingest_football",{p_rows:payload.response,p_asof:updated});if(ingest.error) throw ingest.error;
    }
   }
-  if(body.matchId) {
-   const {error}=await client.rpc("finish_sandbox_fixture",{p_match:body.matchId,p_home:body.home,p_away:body.away,p_void:body.void===true});if(error) throw error;
-  }
+  if(body.matchId || body.home!==undefined || body.away!==undefined || body.void!==undefined) throw Error("Manual results are not supported");
   // Re-runnable reconciliation: a worker interruption never loses a settlement.
-  const pending=await client.from("bets").select("id").eq("status","PENDING").limit(200);
+  const pending=await client.rpc("pending_real_bets");
   if(pending.error) throw pending.error;
   if(body.refresh===true && pending.data?.length) {
-   const selections=await client.from("bet_selections").select("matches!inner(id,sport,start_time,source)").in("bet_id",pending.data.map(b=>b.id)).eq("matches.source","API_FOOTBALL").neq("matches.sport","FOOTBALL");
+   const selections=await client.from("bet_selections").select("matches!inner(id,sport,start_time,source)").in("bet_id",pending.data.map((b:{id:string})=>b.id)).eq("matches.source","API_FOOTBALL").neq("matches.sport","FOOTBALL");
    if(selections.error) throw selections.error;
    const seen=new Set<string>();
    for(const selection of selections.data??[]) {

@@ -196,12 +196,12 @@ fun TransformingLazyColumnScope.detailContent(state: UiState,toggle: (Team)->Uni
 
 }
 fun TransformingLazyColumnScope.settingsContent(state: UiState,vm: MatchViewModel,permission: ()->Unit) {
- item {val shared=vm.mirror.collectAsStateWithLifecycle().value;Text("Cuenta del móvil",style=MatchType.Label,color=MatchColors.Accent);Text(if(!vm.repository.hasReplica()) "Vincula tu móvil para continuar" else if(shared.accountSignedIn) shared.profile.displayName else "Modo DEMO del móvil",style=MatchType.Body,color=MatchColors.Text)}
+ item {val shared=vm.mirror.collectAsStateWithLifecycle().value;Text("Cuenta del móvil",style=MatchType.Label,color=MatchColors.Accent);Text(if(!vm.repository.hasReplica()) "Vincula tu móvil para continuar" else if(shared.accountSignedIn) shared.profile.displayName else "Resultados del móvil",style=MatchType.Body,color=MatchColors.Text)}
  item { SectionTitle("Experiencia",Glyph.Settings) }
  item {Text("Administra el perfil y los avisos desde el móvil.",style=MatchType.Caption,color=MatchColors.Secondary)}
  item { Text("Avisos del estado de tus boletos.",style=MatchType.Caption,color=MatchColors.Secondary) }
  if(state.settings.teams.isEmpty()) item { Text("Sigue un equipo desde un partido para recibir sus avisos.",style=MatchType.Caption,color=MatchColors.Warning) }
- item { Text("MatchControl 2.0",style=MatchType.Caption,color=MatchColors.Secondary) }
+ item { Text("MatchControl 2.1",style=MatchType.Caption,color=MatchColors.Secondary) }
  item { SectionTitle("Conexión",Glyph.Stats) }
  item {val link=vm.sync.state.collectAsStateWithLifecycle().value;StatusNotice(if(link.connected) Glyph.Check else Glyph.Offline,if(link.connected) "Móvil conectado" else "Sin vínculo","Los datos guardados siguen disponibles.",if(link.connected) MatchColors.Accent else MatchColors.Warning)}
  item { Text("Actualizado: "+if(state.updated==0L) "pendiente" else Instant.ofEpochMilli(state.updated).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("dd MMM · HH:mm")),style=MatchType.Caption,color=MatchColors.Secondary) }

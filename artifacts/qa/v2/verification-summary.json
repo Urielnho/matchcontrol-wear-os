@@ -1,6 +1,6 @@
 {
   "core": {
-    "tests": 33,
+    "tests": 39,
     "failures": 0,
     "errors": 0,
     "skipped": 0
@@ -20,13 +20,16 @@
     "Warning": 20
   },
   "android_instrumented": {
-    "tests": 5,
+    "tests": 6,
     "failures": 0
   },
-  "paired_transport_tested": true,
-  "final_review": {
-    "session_race_regressions": 4,
-    "mobile_and_wear_build": "passed",
-    "lint_errors": 0
-  }
+  "postgresql": {
+    "tests": 50,
+    "failures": 0
+  },
+  "feed_tests": {
+    "tests": 6,
+    "failures": 0
+  },
+  "real_provider_events_only": true
 }

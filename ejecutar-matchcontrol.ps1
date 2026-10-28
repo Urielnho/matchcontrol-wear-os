@@ -4,6 +4,7 @@
  [string]$MovilAvd = 'MatchControl_Mobile_Play',
  [string]$RelojAvd = 'MatchControl_Round_QA',
  [string]$ZonaHoraria = 'America/Phoenix',
+ [ValidateRange(1024,65535)][int]$PuertoVinculo = 6660,
  [ValidateRange(60,1800)][int]$EsperaSegundos = 480
 )
 $ErrorActionPreference = 'Stop'
@@ -32,7 +33,7 @@ function Assert-Avd([string]$Serial,[string]$Expected) {
  $name = @(Invoke-AdbChecked -CommandArgs @('-s',$Serial,'emu','avd','name'))
  if (!($name -contains $Expected)) { throw "El dispositivo $Serial no es $Expected. No se instalara nada en ese dispositivo. Revisa Device Manager." }
 }
-function Start-AvdIfNeeded([string]$Name,[int]$Port) {
+function Start-AvdIfNeeded([string]$Name,[int]$Port,[int]$Ram) {
  $serial = "emulator-$Port"
  $devices = @(Invoke-AdbChecked -CommandArgs @('devices'))
  $present = $devices | Where-Object { $_ -match ('^' + [regex]::Escape($serial) + '\s+') }
@@ -40,7 +41,7 @@ function Start-AvdIfNeeded([string]$Name,[int]$Port) {
   if ($present -match '\sdevice\s*$') { Assert-Avd $serial $Name }
   return
  }
- $arguments = @('-avd', ('"' + $Name + '"'), '-port', "$Port", '-no-snapshot', '-no-boot-anim', '-gpu', 'swiftshader', '-feature', '-Vulkan', '-timezone', $ZonaHoraria)
+ $arguments = @('-avd', ('"' + $Name + '"'), '-port', "$Port", '-no-snapshot', '-no-boot-anim', '-gpu', 'swiftshader', '-feature', '-Vulkan', '-memory', "$Ram", '-timezone', $ZonaHoraria)
  if ($SinVentana) { $arguments += @('-no-window','-no-audio') }
  $windowStyle = if ($SinVentana) { 'Hidden' } else { 'Normal' }
  Start-Process -FilePath $emulatorPath -ArgumentList $arguments -WindowStyle $windowStyle | Out-Null
@@ -77,13 +78,15 @@ try {
  $wearApk = Join-Path $PSScriptRoot 'app\build\outputs\apk\debug\wear-debug.apk'
  foreach ($apk in @($mobileApk,$wearApk)) { if (!(Test-Path -LiteralPath $apk)) { throw "Falta $apk. Ejecuta el script sin -SinCompilar." } }
  Invoke-AdbChecked -CommandArgs @('start-server') | Out-Host
- Start-AvdIfNeeded $MovilAvd 5556
- Start-AvdIfNeeded $RelojAvd 5558
+ Start-AvdIfNeeded $MovilAvd 5556 1536
+ Start-AvdIfNeeded $RelojAvd 5558 768
  Wait-Avd 'emulator-5556' $MovilAvd
  Wait-Avd 'emulator-5558' $RelojAvd
  # Recheck both identities immediately before installing. Never uninstall or clear app data.
  Assert-Avd 'emulator-5556' $MovilAvd
  Assert-Avd 'emulator-5558' $RelojAvd
+ # Restore the bridge negotiated for these already-paired development emulators.
+ Invoke-AdbChecked -CommandArgs @('-s','emulator-5556','forward',"tcp:$PuertoVinculo",'tcp:5601') | Out-Host
  foreach ($serial in @('emulator-5556','emulator-5558')) {
   Invoke-AdbChecked -CommandArgs @('-s',$serial,'shell','settings','put','global','auto_time_zone','0') | Out-Host
   Invoke-AdbChecked -CommandArgs @('-s',$serial,'shell','cmd','alarm','set-timezone',$ZonaHoraria) | Out-Host

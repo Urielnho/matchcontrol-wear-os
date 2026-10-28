@@ -1,14 +1,23 @@
 {
-  "transport": "Google Wearable Data Layer",
-  "account_matches": true,
-  "balance_matches": true,
-  "favorites_match": true,
-  "tickets_received": 4,
+  "provider_only": true,
+  "old_practice_removed_from_active_state": true,
+  "phone_events": 675,
+  "watch_events": 30,
   "sports_received": [
     "BASEBALL",
     "BASKETBALL",
     "FOOTBALL",
     "FORMULA1"
   ],
-  "observed_wait_ms": 668
+  "guest_balance": 0,
+  "guest_tickets": 0,
+  "favorites_match": true,
+  "installed_apks_match_release": {
+    "emulator-5556": true,
+    "emulator-5558": true
+  },
+  "apps_running": {
+    "emulator-5556": true,
+    "emulator-5558": true
+  }
 }

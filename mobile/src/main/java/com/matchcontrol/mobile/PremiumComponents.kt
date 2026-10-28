@@ -2,6 +2,8 @@ package com.matchcontrol.mobile
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -56,16 +58,27 @@ import coil.compose.AsyncImage
  val state=when(f.status) {FixtureStatus.LIVE->"● EN VIVO";FixtureStatus.FINAL->"Final";FixtureStatus.VOID->"Anulado";FixtureStatus.SUSPENDED->"Suspendido";else->if(f.startsAt>System.currentTimeMillis()) time(f.startsAt,"HH:mm") else "Por confirmar"}
  Card(onClick=onClick,shape=shape,colors=CardDefaults.cardColors(containerColor=Surface),modifier=Modifier.fillMaxWidth().semantics {contentDescription="${f.home.name} contra ${f.away.name}"}) {
   Column(Modifier.padding(if(hero) 20.dp else 16.dp),verticalArrangement=Arrangement.spacedBy(if(hero) 18.dp else 10.dp)) {
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(f.league,color=Muted,fontSize=11.sp,modifier=Modifier.weight(1f));Text(state,color=if(live) LiveRed else Muted,fontSize=11.sp,fontWeight=FontWeight.Medium)}
-   if(hero) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(sportTitle(f.sport)+" · "+f.league,color=Muted,fontSize=11.sp,modifier=Modifier.weight(1f));Text(state,color=if(live) LiveRed else Muted,fontSize=11.sp,fontWeight=FontWeight.Medium)}
+   if(f.sport==SportKind.FORMULA1) {
+    Icon(Icons.Outlined.Flag,null,tint=Lime,modifier=Modifier.size(28.dp))
+    Text(f.home.name,fontWeight=FontWeight.Bold,fontSize=if(hero) 24.sp else 18.sp)
+    Text(f.away.name,color=Muted,fontSize=12.sp)
+    if(f.raceResults.isNotEmpty()) f.raceResults.filter {it.classified && it.position!=null}.sortedBy {it.position}.take(3).forEach {r->Text("${r.position}. "+(f.participants.firstOrNull {it.id==r.driverId}?.name ?: r.driverId),fontSize=13.sp)}
+   } else if(hero) Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
     Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)) {TeamBadge(f.home,true);Text(f.home.name,fontSize=12.sp,textAlign=TextAlign.Center,maxLines=2)}
     Text(if(f.status==FixtureStatus.SCHEDULED) time(f.startsAt,"HH:mm") else "${f.homeScore ?: "—"} : ${f.awayScore ?: "—"}",fontSize=32.sp,fontWeight=FontWeight.Bold,modifier=Modifier.padding(horizontal=12.dp))
     Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)) {TeamBadge(f.away,true);Text(f.away.name,fontSize=12.sp,textAlign=TextAlign.Center,maxLines=2)}
    } else listOf(f.home to f.homeScore,f.away to f.awayScore).forEach { (team,score)->
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {TeamBadge(team);Text(team.name,fontSize=14.sp,modifier=Modifier.weight(1f),maxLines=1);Text(if(f.status==FixtureStatus.SCHEDULED) "—" else score?.toString() ?: "—",fontSize=18.sp,fontWeight=FontWeight.SemiBold)}
    }
-   if(hero) Text(time(f.startsAt)+(if(f.source=="DEMO") " · DEMO" else ""),fontSize=11.sp,color=Muted,modifier=Modifier.align(Alignment.CenterHorizontally))
+   if(hero || f.sport==SportKind.FORMULA1) Text(time(f.startsAt)+(if(f.source=="DEMO") " · DEMO" else ""),fontSize=11.sp,color=Muted,modifier=Modifier.align(Alignment.CenterHorizontally))
   }
+ }
+}
+@Composable internal fun SportPicker(selected: SportKind?,choose: (SportKind?)->Unit) {
+ Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+  FilterChip(selected=selected==null,onClick={choose(null)},label={Text("Todos")})
+  SportKind.entries.forEach {sport->FilterChip(selected=selected==sport,onClick={choose(sport)},label={Text(sportTitle(sport))})}
  }
 }
 @Composable internal fun BetCard(b: Bet) {
@@ -73,7 +86,7 @@ import coil.compose.AsyncImage
  Card(onClick={expanded=!expanded},shape=shape,colors=CardDefaults.cardColors(containerColor=Surface)) {
   Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(time(b.createdAt)+(if(b.source=="DEMO") " · DEMO" else ""),fontSize=11.sp,color=Muted);Text(status(b.status),fontSize=12.sp,color=if(b.status==BetStatus.WON) Lime else Muted,fontWeight=FontWeight.SemiBold)}
-   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {Column {Text("${credits(b.stake)} créditos",fontSize=19.sp,fontWeight=FontWeight.Bold);Text((if(b.picks.size==1) "1 selección" else "${b.picks.size} selecciones")+" · cuota ${b.totalOdds.toBigDecimalOrNull()?.setScale(2,java.math.RoundingMode.DOWN) ?: b.totalOdds}",fontSize=12.sp,color=Muted)};Icon(if(expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,"Detalles del boleto",tint=Muted)}
+   Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {Column {Text("${credits(b.stake)} créditos",fontSize=19.sp,fontWeight=FontWeight.Bold);Text((if(b.picks.size==1) "1 selección" else "${b.picks.size} selecciones")+" · cuota ${totalOddsLabel(b.totalOdds)}",fontSize=12.sp,color=Muted)};Icon(if(expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,"Detalles del boleto",tint=Muted)}
    if(b.status!=BetStatus.PENDING) Text("Retorno ${credits(b.returned)}",color=if(b.returned>0) Lime else Muted,fontSize=13.sp)
    AnimatedVisibility(expanded) {Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {HorizontalDivider(color=Raised);b.picks.forEach {Text("${it.fixtureLabel} · ${it.label} @ ${odds(it.lockedOdds)}",fontSize=12.sp)};Text("Potencial ${credits(b.potential)} · #${b.id.take(8)}",fontSize=11.sp,color=Muted)}}
   }

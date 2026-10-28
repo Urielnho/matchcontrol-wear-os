@@ -82,5 +82,40 @@ await check('older cached schedule cannot overwrite a newer result',async()=>{
  await db.query('select public.ingest_football($1,$2)',[JSON.stringify([providerFixture]),asof]);
  assert.equal(await scalar("select status from public.matches where id='api:12345'"),'FINAL');
 });
+
+const roundA=crypto.randomUUID(),roundB=crypto.randomUUID();
+await db.query('select public.create_multisport_demo($1,$2)',[alice,roundA]);
+await db.query('select public.create_multisport_demo($1,$2)',[bob,roundB]);
+const educational=(await db.query("select f.id,f.sport,o.id outcome,o.decimal_odds from public.matches f join public.markets m on m.match_id=f.id join public.market_outcomes o on o.market_id=m.id where f.demo_owner=$1 and ((f.sport='FOOTBALL' and m.market_type='WINNER' and o.outcome_key='1') or (f.sport='BASKETBALL' and m.market_type='BASKETBALL_WINNER' and o.outcome_key='1') or (f.sport='BASEBALL' and m.market_type='BASEBALL_WINNER' and o.outcome_key='1') or (f.sport='FORMULA1' and m.market_type='RACE_WINNER' and o.outcome_key='demo-driver-0')) order by f.sport",[alice])).rows;
+await check('four sports create valid educational markets',async()=>assert.equal(educational.length,4));
+await check('demo round retry does not duplicate events',async()=>{await db.query('select public.create_multisport_demo($1,$2)',[alice,roundA]);assert.equal(await scalar('select count(*)::int from public.matches where demo_owner=$1',[alice]),4)});
+await check('another user cannot bet on private demo events',async()=>assert.rejects(()=>scalar('select public.place_demo_bet($1,$2,$3,$4)',[bob,crypto.randomUUID(),100,JSON.stringify({[educational[0].outcome]:18500})]),/Another demo owner/));
+const picks4=Object.fromEntries(educational.map(r=>[r.outcome,Math.round(Number(r.decimal_odds)*10000)]));
+const multi=await place(crypto.randomUUID(),100,picks4);
+await check('mixed-sport parlay locks exact decimal product',async()=>assert.equal(await scalar('select potential_return::text from public.bets where id=$1',[multi]),'1392.95'));
+await check('private demo fixtures and markets obey owner RLS',async()=>{
+ await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${bob}',false);`);
+ try {assert.equal(await scalar('select count(*)::int from public.matches where demo_owner=$1',[alice]),0);assert.equal(await scalar('select count(*)::int from public.market_outcomes where id=$1',[educational[0].outcome]),0)} finally {await db.exec('reset role')}
+});
+const finish=async(row,home,away,order=null)=>db.query('select public.finish_user_demo($1,$2,$3,$4,$5,false)',[alice,row.id,home,away,order===null?null:JSON.stringify(order)]);
+await check('another user cannot finish your demo event',async()=>assert.rejects(()=>db.query('select public.finish_user_demo($1,$2,2,1,null,false)',[bob,educational[0].id]),/Not your/));
+await finish(educational.find(r=>r.sport==='BASKETBALL'),112,105);
+await finish(educational.find(r=>r.sport==='BASEBALL'),6,3);
+await finish(educational.find(r=>r.sport==='FOOTBALL'),2,1);
+await check('mixed parlay waits for the race classification',async()=>assert.equal(await scalar('select status from public.bets where id=$1',[multi]),'PENDING'));
+const race=educational.find(r=>r.sport==='FORMULA1');
+await check('race rejects duplicate or missing drivers',async()=>assert.rejects(()=>finish(race,null,null,['demo-driver-0','demo-driver-0']),/classification/));
+await finish(race,null,null,Array.from({length:12},(_,i)=>'demo-driver-'+i));
+await check('mixed-sport parlay settles after official-shaped final classification',async()=>{assert.equal(await scalar('select status from public.bets where id=$1',[multi]),'WON');assert.equal(await scalar('select returned::text from public.bets where id=$1',[multi]),'1392.95')});
+await check('mixed-sport settlement retry cannot credit twice',async()=>{const before=await scalar('select balance::text from public.wallets where user_id=$1',[alice]);await db.query('select public.settle_demo_bet($1)',[multi]);assert.equal(await scalar('select balance::text from public.wallets where user_id=$1',[alice]),before)});
+await check('snapshot carries sport and classification into watch summaries',async()=>{const snap=await scalar('select public.sandbox_snapshot($1)',[alice]);assert.equal(snap.fixtures.find(f=>f.id===race.id).raceResults.length,12);assert.equal(snap.bets.find(b=>b.id===multi).picks.filter(p=>p.sport!=='FOOTBALL').length,3)});
+
+await db.query('select public.create_multisport_demo($1,$2)',[alice,crypto.randomUUID()]);
+const topRace=(await db.query("select * from public.matches where demo_owner=$1 and sport='FORMULA1' and status='SCHEDULED' order by start_time desc limit 1",[alice])).rows[0];
+await check('demo race has more than ten entrants',async()=>assert.equal(topRace.participants.length,12));
+const topOffer=(await db.query("select o.* from public.market_outcomes o join public.markets m on m.id=o.market_id where m.match_id=$1 and m.market_type='RACE_TOP10' and o.outcome_key='demo-driver-11'",[topRace.id])).rows[0];
+const topTicket=await place(crypto.randomUUID(),100,{[topOffer.id]:18700});
+await finish(topRace,null,null,topRace.participants.map(d=>d.id));
+await check('top ten can lose for an eleventh or twelfth place',async()=>assert.equal(await scalar('select status from public.bets where id=$1',[topTicket]),'LOST'));
 console.log(JSON.stringify({passed,failed:0,engine:'PGlite PostgreSQL; auth schema mocked, no Supabase deployment'}));
 await db.close();

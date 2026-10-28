@@ -17,7 +17,18 @@ class DemoRepository(private val context: Context,val authority: Boolean,private
  private val json=Json { ignoreUnknownKeys=true;encodeDefaults=true }
  private fun read(): Snapshot?=db.readableDatabase.rawQuery("SELECT payload FROM state WHERE id=1",null).use { if(it.moveToFirst()) json.decodeFromString<Snapshot>(it.getString(0)) else null }
  private fun write(s: Snapshot) { check(db.writableDatabase.insertWithOnConflict("state",null,ContentValues().apply { put("id",1);put("payload",json.encodeToString(s)) },SQLiteDatabase.CONFLICT_REPLACE)!=-1L) {"No se pudo guardar el estado"} }
- private val mutable=MutableStateFlow(read() ?: (if(authority) DemoEngine.seed() else Snapshot(profile=Profile(id="",displayName=""),balance=0)).also(::write))
+ private fun initial(): Snapshot {
+  val saved=read()
+  if(saved!=null) {
+   if(authority && saved.fixtures.none {it.sport!=SportKind.FOOTBALL}) {
+    val extra=MultiSportDemo.seed(System.currentTimeMillis())
+    return saved.copy(fixtures=saved.fixtures+extra.first,outcomes=saved.outcomes+extra.second,revision=saved.revision+1).also(::write)
+   }
+   return MultiSportDemo.upgrade(saved).also {if(it!=saved) write(it)}
+  }
+  return (if(authority) DemoEngine.seed() else Snapshot(profile=Profile(id="",displayName=""),balance=0)).also(::write)
+ }
+ private val mutable=MutableStateFlow(initial())
  val state=mutable.asStateFlow()
  private val queued=MutableStateFlow(pending())
  val pendingCommands=queued.asStateFlow()
@@ -64,10 +75,10 @@ class DemoRepository(private val context: Context,val authority: Boolean,private
  override fun reset(requestId: String) { update { DemoEngine.reset(it,requestId) } }
  fun command(c: SyncCommand) { update { s->
   if(c.id in s.processed) s else {
-   require(c.action in setOf("team","league","match","select","refresh")) { "Acción no permitida" }
+   require(c.action in setOf("team","league","match","select","refresh","sport")) { "Acción no permitida" }
    fun Set<String>.set()=if(c.enabled) this+c.target else this-c.target
    val next=when(c.action) {
-    "team"->{ require(s.fixtures.any { it.home.id==c.target || it.away.id==c.target });s.copy(favoriteTeams=s.favoriteTeams.set()) }
+    "team"->{ require(s.fixtures.any { it.home.id==c.target || it.away.id==c.target || it.participants.any {d->d.id==c.target} });s.copy(favoriteTeams=s.favoriteTeams.set()) }
     "league"->{ require(s.fixtures.any { it.leagueId==c.target });s.copy(favoriteLeagues=s.favoriteLeagues.set()) }
     "match"->{ require(s.fixtures.any { it.id==c.target });s.copy(favoriteMatches=s.favoriteMatches.set()) }
     "select"->{ require(s.fixtures.any { it.id==c.target });s.copy(selectedMatch=c.target) }

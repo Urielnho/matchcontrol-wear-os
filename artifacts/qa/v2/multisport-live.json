@@ -1,0 +1,33 @@
+{
+  "passed": 22,
+  "checks": [
+    "hosted real BASKETBALL",
+    "hosted real BASEBALL",
+    "hosted real FORMULA1",
+    "authenticated demonstration is seeded",
+    "four educational sports available",
+    "places sport ticket 0",
+    "retry keeps single debit 0",
+    "places sport ticket 1",
+    "retry keeps single debit 1",
+    "places sport ticket 2",
+    "retry keeps single debit 2",
+    "places sport ticket 3",
+    "retry keeps single debit 3",
+    "places sport ticket 4",
+    "retry keeps single debit 4",
+    "settles FOOTBALL",
+    "settles BASKETBALL",
+    "settles BASEBALL",
+    "settles FORMULA1",
+    "all simple and mixed tickets win",
+    "exact wallet across four sports",
+    "mixed parlay exact return"
+  ],
+  "real_coverage": {
+    "BASKETBALL": 143,
+    "BASEBALL": 32,
+    "FORMULA1": 23
+  },
+  "secret_exposed": false
+}

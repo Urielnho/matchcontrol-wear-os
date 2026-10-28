@@ -1,6 +1,6 @@
 # MatchControl 2.0
 
-Android y Wear OS para consultar fútbol, seguir equipos y gestionar apuestas educativas con créditos virtuales. No hay dinero real, depósitos, retiros ni premios canjeables.
+Android y Wear OS para consultar fútbol, baloncesto, béisbol y F1, seguir equipos o pilotos y gestionar apuestas educativas con créditos virtuales. No hay dinero real, depósitos, retiros ni premios canjeables.
 
 ## Aplicaciones
 
@@ -33,6 +33,8 @@ En el móvil, **Perfil** permite iniciar sesión o crear una cuenta. Si el proye
 
 Elige una cuota de un próximo partido y abre el boleto. Pulsa **Agregar otro partido · crear parlay**, selecciona un mercado de otro encuentro y vuelve al boleto. Con dos o más selecciones aparece **Parlay**, con la cuota total y el retorno potencial. Admite hasta diez partidos distintos; se confirma un solo importe de créditos virtuales. Las cuotas reales dependen de la cobertura del proveedor. En DEMO, partidos y cuotas son ficticios y están identificados.
 
+El parlay puede mezclar los cuatro deportes, con una selección por evento. En **Perfil → Resultados → Demostración** se activan eventos educativos privados para probar todos los mercados y resolverlos desde el laboratorio, usando la misma cuenta de Supabase. F1 utiliza ganador, podio y top 10 con doce pilotos ficticios; los datos reales de F1 no incluyen cuotas. [Reglas y recorrido para presentar](docs/MULTIDEPORTE.md).
+
 ## Supabase y proveedor deportivo
 
 El proyecto configurado es `vxgvhptsxjjixhaldvor` (`reloj`). La configuración pública del cliente permanece en `local.properties`. La clave deportiva existente se configura como secreto `FOOTBALL_API_KEY` de Edge Functions, nunca como credencial Android.
@@ -41,6 +43,7 @@ El proyecto configurado es `vxgvhptsxjjixhaldvor` (`reloj`). La configuración p
 
 - `sandbox`: estado de cuenta, boletos, reinicio explícito del saldo y favoritos.
 - `football`: proxy, caché, cuota diaria y normalización de fixtures y cuotas.
+- `sports`: baloncesto y béisbol con la misma clave API-SPORTS, y calendario/clasificación de F1 mediante Jolpica. Caché compartida y normalización de mercados compatibles.
 - `settle-sandbox`: proceso privado de resultados DEMO y reconciliación idempotente. Requiere una clave secreta del servidor; no es accesible al cliente móvil.
 
 Las variables alojadas `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS`, `SUPABASE_SECRET_KEYS` y `SUPABASE_JWKS` las resuelve el paquete de servidor. No copies claves administrativas al móvil, al reloj ni a Git. Los ejemplos no contienen secretos.
@@ -62,4 +65,4 @@ npm test --prefix backend-tests
 
 Las pruebas PostgreSQL usan PGlite con Auth simulado. Las comprobaciones del servicio alojado están documentadas por separado y no se confunden con esas pruebas locales. [Auditoría inicial](docs/AUDITORIA-2.0.md), [estado y verificación](docs/ESTADO-2.0.md), [evidencia de la app](artifacts/qa/v2/).
 
-Los documentos 1.x permanecen en `docs/historial/`. El código de los proveedores multideporte anteriores se conserva; no se ejecuta como proveedor independiente del reloj en 2.0.
+Los documentos 1.x permanecen en `docs/historial/`. Los proveedores multideporte activos están en Supabase; el reloj utiliza el estado de la cuenta del móvil.

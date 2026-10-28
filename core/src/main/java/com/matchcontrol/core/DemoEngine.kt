@@ -12,10 +12,11 @@ object DemoEngine {
    if(i<3) FixtureStatus.SCHEDULED else if(i==3) FixtureStatus.LIVE else FixtureStatus.FINAL,if(i<3) null else if(i==3) 1 else 2,if(i<3) null else if(i==3) 0 else 1,i>=4,
    events=if(i>=3) listOf("23′ · Gol de ${teams[i].name}","41′ · Tarjeta amarilla") else emptyList(),statistics=if(i>=3) mapOf("Posesión" to "56% · 44%","Tiros" to "8 · 5") else emptyMap()) }
   val markets=fixtures.flatMap { f->MarketType.entries.flatMap { type->
-   val values=when(type) { MarketType.WINNER->listOf(Triple("1",f.home.code,18500),Triple("X","Empate",32500),Triple("2",f.away.code,24000));MarketType.DOUBLE_CHANCE->listOf(Triple("1X","1 o empate",13500),Triple("X2","Empate o 2",14500),Triple("12","Sin empate",12500));MarketType.OVER_UNDER_15->listOf(Triple("OVER","Más de 1.5",14000),Triple("UNDER","Menos de 1.5",26000));MarketType.OVER_UNDER_25->listOf(Triple("OVER","Más de 2.5",19000),Triple("UNDER","Menos de 2.5",18000));MarketType.BOTH_SCORE->listOf(Triple("YES","Sí",17500),Triple("NO","No",20000)) }
+   val values=when(type) { MarketType.WINNER->listOf(Triple("1",f.home.code,18500),Triple("X","Empate",32500),Triple("2",f.away.code,24000));MarketType.DOUBLE_CHANCE->listOf(Triple("1X","1 o empate",13500),Triple("X2","Empate o 2",14500),Triple("12","Sin empate",12500));MarketType.OVER_UNDER_15->listOf(Triple("OVER","Más de 1.5",14000),Triple("UNDER","Menos de 1.5",26000));MarketType.OVER_UNDER_25->listOf(Triple("OVER","Más de 2.5",19000),Triple("UNDER","Menos de 2.5",18000));MarketType.BOTH_SCORE->listOf(Triple("YES","Sí",17500),Triple("NO","No",20000));else->emptyList() }
    values.map { (key,label,odds)->Outcome("${f.id}:${type.name}:$key",f.id,type,key,label,odds,now,f.status==FixtureStatus.SCHEDULED) }
   } }
-  return Snapshot(fixtures=fixtures,outcomes=markets,transactions=listOf(WalletTransaction(newId(),"INITIAL",1_000_000,"demo-profile",now)),updatedAt=now)
+  val extra=MultiSportDemo.seed(now)
+  return Snapshot(fixtures=fixtures+extra.first,outcomes=markets+extra.second,transactions=listOf(WalletTransaction(newId(),"INITIAL",1_000_000,"demo-profile",now)),updatedAt=now)
  }
  fun place(s: Snapshot,r: BetRequest,now: Long=System.currentTimeMillis()): Pair<Snapshot,Bet> {
   require(r.requestId.isNotBlank())
@@ -30,7 +31,8 @@ object DemoEngine {
   val picks=outcomes.map { o->
    val f=s.fixtures.first { it.id==o.matchId }
    require(f.status==FixtureStatus.SCHEDULED && f.startsAt>now && f.source=="DEMO") { "El partido ya comenzó o no pertenece al sandbox" }
-   Pick(o.id,f.id,o.market,o.key,o.label,"${f.home.code} · ${f.away.code}",o.odds)
+   require(SportRules.validOutcome(f,o.market,o.key)) {"Mercado incompatible con el deporte"}
+   Pick(o.id,f.id,o.market,o.key,o.label,eventLabel(f),o.odds,sport=f.sport)
   }
   val bet=Bet(newId(),r.requestId,r.stake,BettingRules.totalOdds(outcomes.map { it.odds }).toPlainString(),BettingRules.returns(r.stake,outcomes.map { it.odds }),picks,createdAt=now)
   return s.copy(balance=s.balance-r.stake,bets=s.bets+bet,transactions=s.transactions+WalletTransaction(newId(),"STAKE",-r.stake,bet.id,now)) to bet

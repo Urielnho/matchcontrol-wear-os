@@ -1,0 +1,14 @@
+{
+  "transport": "Google Wearable Data Layer",
+  "account_matches": true,
+  "balance_matches": true,
+  "favorites_match": true,
+  "tickets_received": 3,
+  "sports_received": [
+    "BASEBALL",
+    "BASKETBALL",
+    "FOOTBALL",
+    "FORMULA1"
+  ],
+  "observed_wait_ms": 363
+}

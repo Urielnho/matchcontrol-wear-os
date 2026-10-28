@@ -25,7 +25,7 @@ class MatchViewModel(app: Application): AndroidViewModel(app) {
  private fun convert(f: Fixture)=Match(legacyId(f.id),Team(legacyId(f.home.id),f.home.name,f.home.logo),Team(legacyId(f.away.id),f.away.name,f.away.logo),f.league,Instant.ofEpochMilli(f.startsAt).atZone(ZoneId.systemDefault()).toOffsetDateTime().toString(),when(f.status) {FixtureStatus.SCHEDULED->"NS";FixtureStatus.LIVE->"LIVE";FixtureStatus.FINAL->"FT";FixtureStatus.VOID->"CANC";FixtureStatus.SUSPENDED->"SUSP"},homeGoals=f.homeScore,awayGoals=f.awayScore,events=f.events,statistics=f.statistics.map {"${it.key}: ${it.value}"},leagueId=legacyId(f.leagueId))
  private fun render(s: Snapshot) {
   val teams=s.favoriteTeams;val leagues=s.favoriteLeagues
-  val matches=s.fixtures.map(::convert).filter {it.date==mutable.value.date}
+  val matches=s.fixtures.filter {it.sport==SportKind.FOOTBALL}.map(::convert).filter {it.date==mutable.value.date}
   mutable.update {old->old.copy(settings=Settings(s.notifications,teams.map {legacyId(it).toString()}.toSet(),leagues.map {legacyId(it).toString()}.toSet()),matches=matches,detail=old.detail?.let { d->s.fixtures.firstOrNull {legacyId(it.id)==d.id}?.let(::convert)},updated=s.dataUpdatedAt.takeIf {it>0} ?: s.updatedAt,online=true,settingsReady=true,knownTeams=s.fixtures.flatMap {listOf(Team(legacyId(it.home.id),it.home.name),Team(legacyId(it.away.id),it.away.name))}.distinctBy {it.id},competitions=s.fixtures.distinctBy {it.leagueId}.map {Competition(legacyId(it.leagueId),it.league,it.league,s.source)}) }
  }
  fun refresh(force: Boolean=false) {render(mirror.value);sync.refresh()}

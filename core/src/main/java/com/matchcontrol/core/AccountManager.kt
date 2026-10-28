@@ -22,7 +22,7 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
  val configured get()=config!=null
  @Volatile private var remote: RemoteRepository?=null
  private fun readCache(): Snapshot?=cache.rawQuery("SELECT payload FROM snapshot WHERE id=1",null).use {if(it.moveToFirst()) json.decodeFromString<Snapshot>(it.getString(0)) else null}
- private fun accept(s: Snapshot) {val old=mutable.value;cache.insertWithOnConflict("snapshot",null,ContentValues().apply {put("id",1);put("payload",json.encodeToString(s))},android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE);mutable.value=s;runCatching {ResultAlerts.changed(context,old,s)}}
+ @Synchronized private fun accept(s: Snapshot) {val old=mutable.value;if(s.profile.id==old.profile.id && s.revision<old.revision) return;cache.insertWithOnConflict("snapshot",null,ContentValues().apply {put("id",1);put("payload",json.encodeToString(s))},android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE);mutable.value=s;runCatching {ResultAlerts.changed(context,old,s)}}
  @Synchronized private fun token(): String {
   val current=session ?: error("Inicia sesión de nuevo")
   if(vault.expiredSoon()) {
@@ -46,9 +46,16 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
   try {if(token!=null && config!=null) runCatching {SupabaseAuth(requireNotNull(config)).signOut(token)}} finally {vault.clear();session=null;remote=null;cache.delete("snapshot",null,null);signed.value=false;mutable.value=demo.state.value}
  }
  fun refresh() {if(signed.value) {val c=client();c.refresh();accept(c.state.value)} else mutable.value=demo.state.value}
- fun loadDate(date: LocalDate) {if(signed.value) {val c=client();try {c.fetchDate(date)} finally {c.refresh();accept(c.state.value)}}}
- fun details(id: String) {if(signed.value) {val c=client();try {c.fetchDetail(id)} finally {c.refresh();accept(c.state.value)}}}
- fun odds(id: String) {if(signed.value) {val c=client();try {c.fetchOdds(id)} finally {c.refresh();accept(c.state.value)}}}
+ fun loadDate(date: LocalDate,sport: SportKind=SportKind.FOOTBALL) {if(signed.value && state.value.source!="DEMO") {val c=client();try {c.fetchSportDate(date,sport)} finally {c.refresh();accept(c.state.value)}}}
+ fun details(id: String) {if(signed.value && state.value.source!="DEMO") {val c=client();try {c.fetchDetail(id)} finally {c.refresh();accept(c.state.value)}}}
+ fun odds(id: String) {if(signed.value && state.value.source!="DEMO") {val c=client();try {c.fetchOdds(id)} finally {c.refresh();accept(c.state.value)}}}
+ fun mode(demoMode: Boolean) {check(signed.value);val c=client();c.mode(demoMode);accept(c.state.value)}
+ fun newDemoRound() {check(state.value.source=="DEMO");if(signed.value) {val c=client();c.newDemoRound();accept(c.state.value)} else demo.update {DemoLab.newRound(it)}}
+ fun demoResult(id: String,home: Int?=null,away: Int?=null,order: List<String>?=null,void: Boolean=false) {
+  check(state.value.source=="DEMO") {"Solo se modifican eventos DEMO"}
+  if(signed.value) {val c=client();c.demoResult(id,home,away,order,void);accept(c.state.value)}
+  else demo.update {when {void->DemoLab.cancel(it,id);order!=null->DemoLab.finishRace(it,id,order);else->DemoLab.finish(it,id,requireNotNull(home),requireNotNull(away))}}
+ }
  fun place(r: BetRequest): Bet=if(signed.value) {val c=client();c.place(r).also {accept(c.state.value)}} else demo.place(r)
  fun reset(id: String) {if(signed.value) {val c=client();c.reset(id);accept(c.state.value)} else demo.reset(id)}
  fun notifications(enabled: Boolean) {if(signed.value) {val c=client();c.notifications(enabled);accept(c.state.value)} else demo.update {it.copy(notifications=enabled)}}
@@ -66,6 +73,7 @@ class AccountManager(private val context: Context,val demo: DemoRepository) {
   }
   if(c.action in listOf("team","league","match")) {val remote=client();remote.favorite(c.action,c.target,c.enabled);accept(remote.state.value)}
   else if(c.action=="refresh") refresh()
+  else if(c.action=="sport") loadDate(LocalDate.now(),SportKind.valueOf(c.target))
   else if(c.action=="select") {require(state.value.fixtures.any {it.id==c.target});mutable.update {it.copy(selectedMatch=c.target)}}
   else error("Acción no permitida")
   demo.update {it.copy(processed=it.processed+c.id)}

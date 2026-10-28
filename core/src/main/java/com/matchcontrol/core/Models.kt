@@ -10,11 +10,13 @@ fun credits(cents: Long)=BigDecimal.valueOf(cents,2).toPlainString()
 fun parseCredits(text: String): Long = text.trim().replace(',','.').toBigDecimal().setScale(2,RoundingMode.UNNECESSARY).movePointRight(2).longValueExact()
 @Serializable enum class FixtureStatus { SCHEDULED,LIVE,FINAL,VOID,SUSPENDED }
 @Serializable enum class BetStatus { PENDING,WON,LOST,VOID }
-@Serializable enum class MarketType { WINNER,DOUBLE_CHANCE,OVER_UNDER_15,OVER_UNDER_25,BOTH_SCORE }
+@Serializable enum class SportKind { FOOTBALL,BASKETBALL,BASEBALL,FORMULA1 }
+@Serializable enum class MarketType { WINNER,DOUBLE_CHANCE,OVER_UNDER_15,OVER_UNDER_25,BOTH_SCORE,BASKETBALL_WINNER,TOTAL_POINTS_2155,BASEBALL_WINNER,TOTAL_RUNS_85,RACE_WINNER,RACE_PODIUM,RACE_TOP10 }
+@Serializable data class RaceResult(val driverId: String,val position: Int?,val classified: Boolean=true)
 @Serializable data class DemoTeam(val id: String,val name: String,val code: String,val logo: String?=null)
-@Serializable data class Fixture(val id: String,val home: DemoTeam,val away: DemoTeam,val leagueId: String,val league: String,val startsAt: Long,val status: FixtureStatus=FixtureStatus.SCHEDULED,val homeScore: Int?=null,val awayScore: Int?=null,val verified: Boolean=false,val source: String="DEMO",val events: List<String> = emptyList(),val statistics: Map<String,String> = emptyMap(),val regulationHomeScore: Int?=null,val regulationAwayScore: Int?=null)
+@Serializable data class Fixture(val id: String,val home: DemoTeam,val away: DemoTeam,val leagueId: String,val league: String,val startsAt: Long,val status: FixtureStatus=FixtureStatus.SCHEDULED,val homeScore: Int?=null,val awayScore: Int?=null,val verified: Boolean=false,val source: String="DEMO",val events: List<String> = emptyList(),val statistics: Map<String,String> = emptyMap(),val regulationHomeScore: Int?=null,val regulationAwayScore: Int?=null,val sport: SportKind=SportKind.FOOTBALL,val participants: List<DemoTeam> = emptyList(),val raceResults: List<RaceResult> = emptyList(),val classificationComplete: Boolean=false)
 @Serializable data class Outcome(val id: String,val matchId: String,val market: MarketType,val key: String,val label: String,val odds: Int,val updatedAt: Long,val open: Boolean=true) // odds / 10000
-@Serializable data class Pick(val outcomeId: String,val matchId: String,val market: MarketType,val key: String,val label: String,val fixtureLabel: String,val lockedOdds: Int,val status: BetStatus=BetStatus.PENDING)
+@Serializable data class Pick(val outcomeId: String,val matchId: String,val market: MarketType,val key: String,val label: String,val fixtureLabel: String,val lockedOdds: Int,val status: BetStatus=BetStatus.PENDING,val sport: SportKind=SportKind.FOOTBALL)
 @Serializable data class Bet(val id: String,val requestId: String,val stake: Long,val totalOdds: String,val potential: Long,val picks: List<Pick>,val status: BetStatus=BetStatus.PENDING,val createdAt: Long,val settledAt: Long?=null,val returned: Long=0,val source: String="DEMO")
 @Serializable data class WalletTransaction(val id: String,val kind: String,val amount: Long,val reference: String,val createdAt: Long)
 @Serializable data class Profile(val id: String="local-demo",val displayName: String="Estudiante")
@@ -40,6 +42,7 @@ object BettingRules {
  fun result(f: Fixture,p: Pick): BetStatus {
   if(f.status==FixtureStatus.VOID) return BetStatus.VOID
   if(f.status!=FixtureStatus.FINAL || !f.verified) return BetStatus.PENDING
+  if(f.sport!=SportKind.FOOTBALL) return SportRules.result(f,p)
   val h=(if(f.source=="DEMO") f.homeScore else f.regulationHomeScore) ?: return BetStatus.PENDING
   val a=(if(f.source=="DEMO") f.awayScore else f.regulationAwayScore) ?: return BetStatus.PENDING
   val win=when(p.market) {
@@ -48,6 +51,7 @@ object BettingRules {
    MarketType.OVER_UNDER_15->if(p.key=="OVER") h+a>=2 else h+a<=1
    MarketType.OVER_UNDER_25->if(p.key=="OVER") h+a>=3 else h+a<=2
    MarketType.BOTH_SCORE->if(p.key=="YES") h>0 && a>0 else h==0 || a==0
+   else->return BetStatus.PENDING
   }
   return if(win) BetStatus.WON else BetStatus.LOST
  }

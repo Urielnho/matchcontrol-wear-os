@@ -1,0 +1,19 @@
+{
+  "transport": "Google Wearable Data Layer",
+  "account_matches": true,
+  "balance_matches": true,
+  "favorites_match": true,
+  "tickets_received": 6,
+  "sports_received": [
+    "BASEBALL",
+    "BASKETBALL",
+    "FOOTBALL",
+    "FORMULA1"
+  ],
+  "observed_wait_ms": 266,
+  "mixed_sport_ticket_received": true,
+  "phone_favorite_received_on_watch": true,
+  "watch_favorite_received_on_phone": true,
+  "logout_clears_cloud_account_on_watch": true,
+  "local_balance_and_history_preserved": true
+}

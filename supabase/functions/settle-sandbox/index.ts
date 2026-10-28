@@ -1,4 +1,5 @@
 import { withSupabase } from "npm:@supabase/server@1.9.2";
+import {loadSport,type Sport} from "../_shared/sports.ts";
 
 // Private worker: this credential is never present in Android artifacts.
 Deno.serve(withSupabase({auth:"secret"},async(req: Request,ctx)=>{
@@ -33,6 +34,16 @@ Deno.serve(withSupabase({auth:"secret"},async(req: Request,ctx)=>{
   // Re-runnable reconciliation: a worker interruption never loses a settlement.
   const pending=await client.from("bets").select("id").eq("status","PENDING").limit(200);
   if(pending.error) throw pending.error;
+  if(body.refresh===true && pending.data?.length) {
+   const selections=await client.from("bet_selections").select("matches!inner(id,sport,start_time,source)").in("bet_id",pending.data.map(b=>b.id)).eq("matches.source","API_FOOTBALL").neq("matches.sport","FOOTBALL");
+   if(selections.error) throw selections.error;
+   const seen=new Set<string>();
+   for(const selection of selections.data??[]) {
+    const event=selection.matches as unknown as {id:string;sport:Sport;start_time:string};
+    if(!event || seen.has(event.id) || Date.parse(event.start_time)>Date.now() || seen.size>=10) continue;
+    seen.add(event.id);await loadSport(client,event.sport,{id:event.id,action:"events"});
+   }
+  }
   for(const bet of pending.data ?? []) {const {error}=await client.rpc("settle_demo_bet",{p_bet:bet.id});if(error) throw error;}
   return Response.json({processed:pending.data?.length ?? 0});
  } catch {return Response.json({error:"Worker operation rejected"},{status:409});}

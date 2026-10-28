@@ -1,6 +1,6 @@
 {
   "core": {
-    "tests": 20,
+    "tests": 29,
     "failures": 0,
     "errors": 0,
     "skipped": 0
@@ -23,5 +23,5 @@
     "tests": 5,
     "failures": 0
   },
-  "paired_transport_tested": false
+  "paired_transport_tested": true
 }

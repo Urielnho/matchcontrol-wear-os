@@ -7,7 +7,8 @@
 - DEMO local explícito: 10,000 créditos, SQLite, apuestas simples/combinadas, cuotas bloqueadas, liquidación, anulaciones y reinicio confirmado. No representa dinero real.
 - Supabase activo: Auth, sesión cifrada con Android Keystore, caché persistente, RLS por propietario y operaciones financieras atómicas e idempotentes.
 - Misma credencial API-Football existente, almacenada únicamente como secreto del servidor. Móvil y reloj comparten datos a través del backend y Data Layer; no incorporan la clave deportiva.
-- Encuentros, horarios, marcadores, eventos, estadísticas y cuotas según la cobertura del proveedor. Las cuotas ausentes no se sustituyen por precios ficticios. Los mercados reglamentarios requieren un marcador reglamentario verificado.
+- Fútbol, baloncesto, béisbol y F1 activos en móvil y reloj, con selección de deporte, marcadores específicos y parlays mixtos. Los mercados y la liquidación se detallan en [Multideporte](MULTIDEPORTE.md).
+- Encuentros, horarios, marcadores, eventos, estadísticas y cuotas según la cobertura del proveedor. Las cuotas ausentes no se sustituyen por precios ficticios. El modo DEMO de la misma cuenta permite probar los cuatro deportes con eventos educativos privados; los mercados de F1 se demuestran en ese modo porque el proveedor actual no entrega cuotas de F1.
 - Trabajador privado de resultados, programado cada 30 minutos. Consulta fechas con apuestas reales pendientes; respeta caché y presupuesto de consultas. La prueba manual del trabajador respondió 200; el cron está activo. Esto no prueba todavía una ejecución disparada por el cron.
 - Cola persistente, réplica acotada y acciones idempotentes de Wearable Data Layer. El reloj consulta saldo y boletos; la confirmación financiera sucede en el móvil.
 
@@ -15,11 +16,12 @@
 
 | Alcance | Resultado |
 | --- | --- |
-| JVM core | 20 pruebas aprobadas |
+| JVM core | 29 pruebas aprobadas |
 | JVM reloj, existentes | 31 pruebas aprobadas |
 | Android instrumentado | 5 pruebas aprobadas: SQLite, cola/réplica, cifrado Keystore, cambios de cuenta y orden de favoritos |
-| PostgreSQL local, PGlite con Auth simulado | 24 pruebas aprobadas |
+| PostgreSQL local, PGlite con Auth simulado | 37 pruebas aprobadas |
 | Backend alojado, contabilidad con cuenta QA | 25 comprobaciones aprobadas |
+| Backend alojado, multideporte | 22 comprobaciones nuevas: datos reales, cuatro simples, parlay mixto, liquidación e idempotencia |
 | Auth y proveedor alojados | Acceso 200, consulta de 161 encuentros reales; accesos sin token o inválidos 401 |
 | Trabajador privado | Instalación y actualización 200; ningún secreto en la respuesta |
 | Interfaz Android real | Cinco secciones, detalle, boleto DEMO, confirmación, persistencia tras reinicio e inicio de sesión remoto |
@@ -27,6 +29,7 @@
 | Interfaz Wear OS circular | APK instalado y abierto; pantalla de créditos y boletos comprobada visualmente |
 | Parlay móvil | Dos partidos distintos elegidos desde la interfaz, boleto confirmado y conservado tras reiniciar. Acceso visible para agregar otro partido; límite de diez eventos. |
 | Cuenta compartida, interfaz | Favorito añadido desde el móvil y conservado al reiniciar; reloj sin cuenta ni saldo propios antes de vincularse. Capturas actualizadas. |
+| Enlace real multideporte | Cuenta, saldo, favoritos y seis boletos recibidos en el reloj; parlay de cuatro deportes abierto allí; favorito eliminado desde el reloj reflejado en el móvil |
 
 La prueba financiera alojada cubrió simples, combinada, victoria, derrota, anulación, reintentos sin doble débito ni doble abono, bloqueo de escritura directa de saldo y reinicio explícito. Utilizó eventos QA identificados como DEMO; no alteró resultados reales.
 
@@ -42,16 +45,16 @@ El reloj muestra equipos, ligas y encuentros guardados, incluso si sus nombres n
 
 Las pruebas añadidas cubren cambio de cuenta con revisión menor, mensajes fuera de orden, instalación anterior retirada, descarte de acciones ajenas, favoritos optimistas, acciones atrasadas, conservación de parlays pendientes y límite del resumen. Son pruebas del protocolo y la persistencia; **no sustituyen una prueba del transporte Google entre dispositivos vinculados**.
 
-Las pantallas pobladas de favoritos y detalle de boleto del reloj todavía requieren validar visualmente con una réplica recibida por el enlace real; no se inyectaron datos para presentarlos como una sincronización comprobada.
+El enlace real ya se comprobó por Wearable Data Layer: el reloj recibió la misma cuenta, saldo, favoritos y eventos de los cuatro deportes. Después recibió seis boletos de la cuenta QA, incluido un parlay mixto, y permitió abrir sus selecciones. Se añadió un favorito desde el móvil y se quitó desde el reloj; ambos cambios se recibieron sin pulsar Actualizar. La comprobación leyó las réplicas de ambos dispositivos sin inyectar datos. Evidencia: `paired-transport.json`, `paired-multisport.json` y capturas `premium-watch-four-sport-*`.
 
 Los resultados reproducibles y las capturas están en `artifacts/qa/v2/`. Los totales de pruebas y lint se pueden regenerar con `preparar-entrega.py` después de compilar. La evidencia corresponde a esta ejecución; no demuestra cobertura de todos los dispositivos ni disponibilidad permanente del proveedor.
 
 ## Pendiente y límites concretos
 
-- **Completar el vínculo y comprobar el transporte de extremo a extremo.** Ya se creó y ejecutó **MatchControl Mobile Play Store**, con una imagen Google Play y el APK móvil; el reloj circular también está abierto. Se comprobaron la presencia de Play Store y la restauración de tres boletos DEMO, un favorito y el saldo del teléfono anterior. Falta el paso interactivo de acceso a Google, aplicación complementaria y Device Manager → Pair Wearable. El control de ventanas de Android Studio no está disponible en esta sesión. [Guía para completar el enlace](VINCULAR-DISPOSITIVOS.md). Tener ambos emuladores abiertos no establece la vinculación.
+- **Dispositivos:** la vinculación ya entregó datos reales de la aplicación entre **MatchControl Mobile Play Store** y **MatchControl Round QA**. Después de reiniciar el entorno, Android Studio restableció el puente. La app complementaria de Google puede solicitar completar su configuración; no se automatiza ese acceso. [Guía del enlace](VINCULAR-DISPOSITIVOS.md).
 - Las notificaciones locales se muestran al observar la liquidación; no hay entrega push FCM garantizada con la aplicación cerrada. El servidor sí puede liquidar independientemente del móvil.
 - La cobertura de ligas, fechas, estadísticas y cuotas depende del plan de API-Football. No se promete información que el proveedor no entregue. La hora visible utiliza la zona local; un partido aplazado o sin estado actualizado puede mostrarse por confirmar.
-- El código multideporte 1.x permanece conservado; en 2.0 el proveedor activo centralizado es fútbol.
+- Se conserva el código 1.x. Los proveedores activos de los cuatro deportes están centralizados en el servidor; el reloj consume la cuenta y los resúmenes del móvil.
 - Los APK de entrega son de desarrollo, adecuados para evaluación e instalación local. Una publicación comercial requeriría firma de distribución, políticas de privacidad y validación adicional.
 
 ## Reproducir

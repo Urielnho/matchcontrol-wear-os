@@ -20,6 +20,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.matchcontrol.domain.Sport
+import com.matchcontrol.core.SportKind
+import com.matchcontrol.core.sportTitle
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import androidx.wear.compose.material3.*
@@ -36,6 +38,8 @@ import kotlinx.coroutines.delay
  val sportsVm: SportsViewModel = viewModel()
  val extra by sportsVm.state.collectAsStateWithLifecycle()
  val nav=rememberSwipeDismissableNavController()
+ var chosenSport by rememberSaveable {mutableStateOf(SportKind.BASKETBALL)}
+ var chosenFixture by rememberSaveable {mutableStateOf<String?>(null)}
  val lifecycle=LocalLifecycleOwner.current
  val config=LocalConfiguration.current
  val density=LocalDensity.current
@@ -52,7 +56,7 @@ import kotlinx.coroutines.delay
  MatchControlTheme {
   AppScaffold(modifier=Modifier.fillMaxSize().clip(if(config.isScreenRound) CircleShape else RectangleShape).background(MatchColors.Background),timeText={TimeText()}) {
    SwipeDismissableNavHost(navController=nav,startDestination="home") {
-    listOf("home","live","upcoming","results","favorites","settings","details","sports","sportfeed","sportdetail","sandbox","bet/{id}").forEach { route -> composable(route) { backEntry ->
+    listOf("home","live","upcoming","results","favorites","settings","details","sports","sportfeed","sportdetail","sandbox","bet/{id}","sharedsport","shareddetail").forEach { route -> composable(route) { backEntry ->
  val matches=s.matches.filter { m -> s.settings.leagues.isEmpty() || s.competitions.any { it.id.toString() in s.settings.leagues && it.includes(m) } }
 
      LaunchedEffect(route) { if(route=="home") vm.today() }
@@ -76,7 +80,7 @@ import kotlinx.coroutines.delay
         else Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
          IconButton(onClick={nav.popBackStack()},modifier=Modifier.size(MatchSpace.Touch).semantics { contentDescription="Volver" }) { SportGlyph(Glyph.Back,Modifier.size(20.dp)) }
          Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-         Text(when(route) { "sandbox"->"Boletos";"bet/{id}"->"Boleto";"live"->"En vivo";"upcoming"->"Próximos";"results"->"Resultados";"favorites"->"Favoritos";"settings"->"Ajustes";"sports"->"Deportes";"sportfeed","sportdetail"->extra.sport.title;else->"Partido" },style=MatchType.Title,color=MatchColors.Text)
+         Text(when(route) { "sandbox"->"Boletos";"bet/{id}"->"Boleto";"sharedsport","shareddetail"->sportTitle(chosenSport);"live"->"En vivo";"upcoming"->"Próximos";"results"->"Resultados";"favorites"->"Favoritos";"settings"->"Ajustes";"sports"->"Deportes";"sportfeed","sportdetail"->extra.sport.title;else->"Partido" },style=MatchType.Title,color=MatchColors.Text)
          }
         }
        }
@@ -103,14 +107,16 @@ import kotlinx.coroutines.delay
          item {SportAction("Créditos y boletos",Glyph.Star) {nav.navigate("sandbox")}}
         }
         "live","upcoming","results"->sportListing(route,s,matches,vm::day) { vm.select(it);nav.navigate("details") }
-        "favorites"->sharedFavoritesContent(sandbox,vm::favorite) {vm.selectFixture(it);nav.navigate("details")}
+        "favorites"->sharedFavoritesContent(sandbox,vm::favorite) {if(it.sport==SportKind.FOOTBALL) {vm.selectFixture(it);nav.navigate("details")} else {chosenSport=it.sport;chosenFixture=it.id;nav.navigate("shareddetail")}}
         "details"->{detailContent(s,vm::toggleTeam);s.detail?.let { match->
          item {SportAction("Enviar al móvil",Glyph.Refresh) {vm.sync.command(com.matchcontrol.core.SyncCommand(action="select",target=vm.externalId(match.id)))}}
          item {SportAction(if(vm.externalId(match.id) in sandbox.favoriteMatches) "Quitar partido favorito" else "Guardar partido",Glyph.Star) {vm.sync.command(com.matchcontrol.core.SyncCommand(action="match",target=vm.externalId(match.id),enabled=vm.externalId(match.id) !in sandbox.favoriteMatches))}}
         }}
         "sandbox"->sandboxContent(sandbox,link,vm.repository.hasReplica(),{vm.sync.refresh()}) {nav.navigate("bet/${it.id}")}
         "bet/{id}"->betDetailContent(sandbox.bets.firstOrNull {it.id==backEntry.arguments?.getString("id")},sandbox)
-        "sports"->sportsPicker { sport -> if(sport==Sport.FOOTBALL) nav.popBackStack("home",false) else { sportsVm.choose(sport);nav.navigate("sportfeed") } }
+        "sports"->sportsPicker { sport -> if(sport==Sport.FOOTBALL) nav.popBackStack("home",false) else {chosenSport=SportKind.valueOf(sport.name);vm.sync.command(com.matchcontrol.core.SyncCommand(action="sport",target=chosenSport.name));nav.navigate("sharedsport")} }
+        "sharedsport"->sharedSportContent(sandbox,chosenSport) {chosenFixture=it.id;nav.navigate("shareddetail")}
+        "shareddetail"->sharedFixtureContent(sandbox.fixtures.firstOrNull {it.id==chosenFixture},vm::favorite,sandbox) {vm.sync.command(com.matchcontrol.core.SyncCommand(action="select",target=it.id))}
         "sportfeed"->sportsFeed(extra,sportsVm::day,{sportsVm.refresh(true)}) { sportsVm.select(it);nav.navigate("sportdetail") }
         "sportdetail"->sportsDetail(extra)
         "settings"->settingsContent(s,vm,requestPermission)

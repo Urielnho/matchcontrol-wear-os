@@ -33,9 +33,18 @@ Deno.serve(withSupabase({auth:"user"},async (req: Request,ctx) => {
     } else if(body.action==="notifications") {
       if(typeof body.enabled!=="boolean") throw new Error("Invalid preference");
       const {error}=await ctx.supabase.from("notification_preferences").update({enabled:body.enabled}).eq("user_id",uid);if(error) throw error;
+    } else if(body.action==="demoRound") {
+      const {error}=await admin.rpc("create_multisport_demo",{p_user:uid,p_request:body.requestId});if(error) throw error;
+    } else if(body.action==="demoResult") {
+      const {error}=await admin.rpc("finish_user_demo",{p_user:uid,p_match:body.matchId,p_home:body.home??null,p_away:body.away??null,p_order:body.order??null,p_void:body.void===true});if(error) throw error;
     } else if(body.action==="mode") {
       if(!["DEMO","API_FOOTBALL"].includes(body.source)) throw new Error("Invalid mode");
       const {error}=await ctx.supabase.from("profiles").update({data_mode:body.source}).eq("id",uid);if(error) throw error;
+      if(body.source==="DEMO") {
+        const existing=await ctx.supabase.from("matches").select("id").eq("demo_owner",uid).eq("status","SCHEDULED").gt("start_time",new Date().toISOString()).limit(1);
+        if(existing.error) throw existing.error;
+        if(!existing.data?.length) {const created=await admin.rpc("create_multisport_demo",{p_user:uid,p_request:crypto.randomUUID()});if(created.error) throw created.error;}
+      }
     } else if(body.action!=="snapshot") throw new Error("Action not allowed");
     const {data,error}=await ctx.supabase.rpc("sandbox_snapshot",{p_user:uid});if(error) throw error;
     return Response.json(data);

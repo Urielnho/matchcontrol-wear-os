@@ -45,15 +45,17 @@ class MobileViewModel(app: Application): AndroidViewModel(app) {
  } }
  private fun withContextOnMain(block: ()->Unit) { viewModelScope.launch(Dispatchers.Main) { block() } }
  fun favorite(action: String,id: String,enabled: Boolean) = act { account.command(SyncCommand(action=action,target=id,enabled=enabled)) }
- fun finish(id: String,home: Int,away: Int)=act { check(!signedIn.value) {"El laboratorio solo modifica la demostración local"};repo.update { DemoLab.finish(it,id,home,away) } }
- fun cancel(id: String)=act { check(!signedIn.value);repo.update { DemoLab.cancel(it,id) } }
- fun newRound()=act {check(!signedIn.value);repo.update {DemoLab.newRound(it)}}
+ fun finish(id: String,home: Int,away: Int)=act {account.demoResult(id,home,away)}
+ fun finishRace(id: String,order: List<String>)=act {account.demoResult(id,order=order)}
+ fun cancel(id: String)=act {account.demoResult(id,void=true)}
+ fun newRound()=act {account.newDemoRound()}
+ fun mode(demo: Boolean)=act {account.mode(demo);slip.value=emptyList()}
  fun reset()=act { account.reset(newId()) }
  fun notifications(enabled: Boolean)=act {account.notifications(enabled)}
  fun login(email: String,password: String,create: Boolean)=act {account.signIn(email,password,create);slip.value=emptyList();runCatching {account.loadDate(java.time.LocalDate.now())}.onFailure {message.value="No se pudieron actualizar los partidos. Intenta de nuevo."}}
  fun logout()=act {account.signOut();slip.value=emptyList()}
  fun refresh()=act {account.refresh();account.loadDate(java.time.LocalDate.now());sync.refresh()}
- fun date(date: java.time.LocalDate)=act {account.loadDate(date)}
+ fun date(date: java.time.LocalDate,sport: SportKind=SportKind.FOOTBALL)=act {account.loadDate(date,sport)}
  fun details(id: String)=act {account.details(id)}
  fun markets(id: String)=act {account.odds(id)}
  fun poll()=act {account.refresh()}

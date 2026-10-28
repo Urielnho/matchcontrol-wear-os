@@ -25,12 +25,13 @@ object WatchMirror {
  fun compact(snapshot: Snapshot,maxBytes: Int=85_000): Snapshot {
   val bets=snapshot.bets.sortedWith(compareBy<Bet> {it.status!=BetStatus.PENDING}.thenByDescending {it.createdAt}).take(30).sortedBy {it.createdAt}
   val referenced=bets.flatMap {it.picks.map(Pick::matchId)}.toSet()
-  val favorites=snapshot.fixtures.filter {it.id in snapshot.favoriteMatches || it.leagueId in snapshot.favoriteLeagues || it.home.id in snapshot.favoriteTeams || it.away.id in snapshot.favoriteTeams}
-  val fixtures=(snapshot.fixtures.filter {it.id in referenced}+favorites+snapshot.fixtures.filter {it.status==FixtureStatus.LIVE}.take(8)+snapshot.fixtures.filter {it.status==FixtureStatus.SCHEDULED}.sortedBy {it.startsAt}.take(10)+snapshot.fixtures.sortedByDescending {it.startsAt}.take(6)).distinctBy {it.id}.take(35)
+  val favorites=snapshot.fixtures.filter {it.id in snapshot.favoriteMatches || it.leagueId in snapshot.favoriteLeagues || it.home.id in snapshot.favoriteTeams || it.away.id in snapshot.favoriteTeams || it.participants.any {d->d.id in snapshot.favoriteTeams}}
+  val representatives=SportKind.entries.flatMap {sport->snapshot.fixtures.filter {it.sport==sport}.sortedWith(compareBy<Fixture> {it.status!=FixtureStatus.SCHEDULED}.thenBy {if(it.startsAt>System.currentTimeMillis()) it.startsAt else Long.MAX_VALUE-it.startsAt}).take(3)}
+  val fixtures=(snapshot.fixtures.filter {it.id in referenced}+representatives+favorites+snapshot.fixtures.filter {it.status==FixtureStatus.LIVE}.take(8)+snapshot.fixtures.filter {it.status==FixtureStatus.SCHEDULED}.sortedBy {it.startsAt}.take(10)+snapshot.fixtures.sortedByDescending {it.startsAt}.take(6)).distinctBy {it.id}.take(35)
   var result=snapshot.copy(
    fixtures=fixtures.map {it.copy(events=it.events.take(4).map {text->text.take(180)},statistics=it.statistics.entries.take(6).associate {p->p.key.take(80) to p.value.take(100)})},
    bets=bets,outcomes=emptyList(),transactions=emptyList(),processed=snapshot.processed.toList().takeLast(256).toSet(),
-   favoriteTeamDetails=(snapshot.favoriteTeamDetails+snapshot.fixtures.flatMap {listOf(it.home,it.away)}).distinctBy {it.id}.filter {it.id in snapshot.favoriteTeams},
+   favoriteTeamDetails=(snapshot.favoriteTeamDetails+snapshot.fixtures.flatMap {listOf(it.home,it.away)+it.participants}).distinctBy {it.id}.filter {it.id in snapshot.favoriteTeams},
    favoriteLeagueDetails=(snapshot.favoriteLeagueDetails+snapshot.fixtures.map {FavoriteLeague(it.leagueId,it.league)}).distinctBy {it.id}.filter {it.id in snapshot.favoriteLeagues},
    totalBetCount=snapshot.bets.size
   )

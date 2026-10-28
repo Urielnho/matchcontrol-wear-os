@@ -36,17 +36,27 @@ class RemoteRepository(private val config: RemoteConfig,private val accessToken:
   requestJson(config,"/functions/v1/football",buildJsonObject {put("endpoint","fixtures");put("params",buildJsonObject {put("date",date.toString());put("timezone",ZoneId.systemDefault().id)})},accessToken())
   refresh()
  }
+ fun fetchSportDate(date: LocalDate,sport: SportKind) {
+  if(sport==SportKind.FOOTBALL) {fetchDate(date);return}
+  requestJson(config,"/functions/v1/sports",buildJsonObject {put("action","events");put("sport",sport.name);put("date",date.toString())},accessToken());refresh()
+ }
+ private fun sportOf(id: String)=when {id.startsWith("basket:")->SportKind.BASKETBALL;id.startsWith("base:")->SportKind.BASEBALL;id.startsWith("f1:")->SportKind.FORMULA1;else->SportKind.FOOTBALL}
  fun fetchDetail(matchId: String) {
+  if(sportOf(matchId)!=SportKind.FOOTBALL) {requestJson(config,"/functions/v1/sports",buildJsonObject {put("action","events");put("sport",sportOf(matchId).name);put("id",matchId)},accessToken());refresh();return}
   if(!matchId.startsWith("api:")) return
   requestJson(config,"/functions/v1/football",buildJsonObject {put("endpoint","fixtures");put("params",buildJsonObject {put("id",matchId.substringAfter(':'))})},accessToken())
   refresh()
  }
  fun fetchOdds(matchId: String) {
+  if(sportOf(matchId)!=SportKind.FOOTBALL) {requestJson(config,"/functions/v1/sports",buildJsonObject {put("action","odds");put("sport",sportOf(matchId).name);put("id",matchId)},accessToken());refresh();return}
   if(!matchId.startsWith("api:")) return
   requestJson(config,"/functions/v1/football",buildJsonObject {put("endpoint","odds");put("params",buildJsonObject {put("fixture",matchId.substringAfter(':'))})},accessToken())
   refresh()
  }
  fun notifications(enabled: Boolean) {mutable.value=json.decodeFromJsonElement(invoke(buildJsonObject {put("action","notifications");put("enabled",enabled)}))}
+ fun mode(demo: Boolean) {mutable.value=json.decodeFromJsonElement(invoke(buildJsonObject {put("action","mode");put("source",if(demo) "DEMO" else "API_FOOTBALL")}))}
+ fun newDemoRound() {mutable.value=json.decodeFromJsonElement(invoke(buildJsonObject {put("action","demoRound");put("requestId",newId())}))}
+ fun demoResult(id: String,home: Int?=null,away: Int?=null,order: List<String>?=null,void: Boolean=false) {mutable.value=json.decodeFromJsonElement(invoke(buildJsonObject {put("action","demoResult");put("matchId",id);home?.let {put("home",it)};away?.let {put("away",it)};order?.let {put("order",json.encodeToJsonElement(it))};put("void",void)}))}
  override fun matches()=mutable.value.fixtures
  override fun results()=matches().filter {it.status==FixtureStatus.FINAL}
  override fun markets(matchId: String)=mutable.value.outcomes.filter {it.matchId==matchId}

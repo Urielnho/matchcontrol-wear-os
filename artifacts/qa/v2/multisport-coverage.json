@@ -1,0 +1,16 @@
+{
+  "BASKETBALL": {
+    "count": 61,
+    "errors": []
+  },
+  "BASEBALL": {
+    "count": 14,
+    "errors": []
+  },
+  "F1_calendar": {
+    "races": 23
+  },
+  "F1_results": {
+    "races": 1
+  }
+}
